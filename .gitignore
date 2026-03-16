@@ -1,0 +1,11 @@
+vendor/
+uploads/designs/*
+uploads/gallery/*
+uploads/quotations/*
+!uploads/designs/.gitkeep
+!uploads/gallery/.gitkeep
+!uploads/quotations/.gitkeep
+config.php
+*.log
+.DS_Store
+Thumbs.db

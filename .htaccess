@@ -1,0 +1,27 @@
+Options -Indexes
+ServerSignature Off
+
+# Protect sensitive files
+<FilesMatch "\.(sql|json|md|log)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Protect config
+<Files "config.php">
+    Order Allow,Deny
+    Deny from all
+</Files>
+
+# Protect uploads directory from PHP execution
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^uploads/.*\.php$ - [F,L]
+</IfModule>
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>

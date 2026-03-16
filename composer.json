@@ -1,0 +1,13 @@
+{
+  "name": "printcraft/printing-shop",
+  "description": "Printing Shop Quotation Website",
+  "require": {
+    "dompdf/dompdf": "^2.0",
+    "phpmailer/phpmailer": "^6.8"
+  },
+  "autoload": {
+    "psr-4": {
+      "PrintCraft\\": "src/"
+    }
+  }
+}
