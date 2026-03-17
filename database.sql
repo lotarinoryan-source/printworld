@@ -141,18 +141,19 @@ CREATE TABLE IF NOT EXISTS premium_clients (
 -- ===================== DEFAULT DATA =====================
 
 INSERT IGNORE INTO admins (username, password, email) VALUES
-('admin', '$2y$10$placeholder_will_be_set_by_fix_script', 'digosprinting@gmail.com');
+('adminprintworld', '$2y$10$HjAkd8segBMSIiOBhgt10.c4rc77uDIv4xqAN0Ds2DzIrlnheM4Nq', 'digosprinting@gmail.com');
 
 -- Add columns if upgrading from older schema
 ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS category ENUM('basic','sublimation','signage') DEFAULT 'basic';
 ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS image_path VARCHAR(255) DEFAULT NULL;
 ALTER TABLE quotation_requests ADD COLUMN IF NOT EXISTS location VARCHAR(255) AFTER signage_address;
+ALTER TABLE final_quotations ADD COLUMN IF NOT EXISTS location VARCHAR(255) DEFAULT NULL AFTER notes;
 
 INSERT IGNORE INTO service_categories (name, slug, description, icon, category, sort_order) VALUES
 -- Basic Services
 ('Keychain',     'keychain',    'Personalized keychains for any occasion',                   'fa-key',          'basic', 0),
 ('Mug',          'mug',         'Custom printed mugs — perfect for gifts and promotions',    'fa-mug-hot',      'basic', 1),
-('Souvenirs',    'souvenirs',   'Custom souvenirs for weddings, birthdays, and events',      'fa-gift',         'basic', 2),
+('Invitation',   'invitation',  'Custom printed invitations for weddings, birthdays, and events', 'fa-envelope',  'basic', 2),
 ('Keyholder',    'keyholder',   'Custom keyholders with your design or logo',                'fa-key',          'basic', 3),
 ('Ref Magnets',  'ref-magnets', 'Custom refrigerator magnets for promos and giveaways',      'fa-magnet',       'basic', 4),
 ('Tarpaulin',    'tarpaulin',   'High-quality tarpaulin printing for events and promotions', 'fa-image',        'basic', 5),
@@ -181,8 +182,8 @@ INSERT IGNORE INTO prices (item_key, item_name, price, unit) VALUES
 ('signage_sqft', 'Signage', 450.00, 'per sq ft');
 
 INSERT IGNORE INTO site_content (content_key, content_value) VALUES
-('hero_title', 'Premium Printing Solutions'),
-('hero_subtitle', 'Quality prints that make your brand stand out. From tarpaulins to custom souvenirs — we bring your ideas to life.'),
+('hero_title', 'Printworld Advertising Services'),
+('hero_subtitle', 'Highest in Quality, Lowest in Prices.'),
 ('about_title', 'About Printworld'),
 ('about_text', 'Printworld is a professional printing shop dedicated to delivering high-quality printing services. With years of experience, we bring your ideas to life with precision and creativity. From tarpaulins to custom souvenirs, we handle it all.'),
 ('contact_address', 'Digos City, Davao del Sur, Philippines'),

@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once '../config.php';
 require_once '../includes/auth.php';
 require_once '../includes/db.php';
@@ -43,7 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
     $premDear      = sanitizeInput($_POST['prem_dear'] ?? '');
     $preparedBy    = sanitizeInput($_POST['prem_prepared_by'] ?? 'Niño S. Del Rosario');
     $checkedBy     = sanitizeInput($_POST['prem_checked_by'] ?? 'Ryan Mark R. Lotarino');
-    $discountPct   = (float)($_POST['discount_percent'] ?? 0);
+    $location      = sanitizeInput($_POST['location'] ?? '');
+    $discountAmt   = (float)($_POST['discount_amount'] ?? 0);
     $notes         = sanitizeInput($_POST['notes'] ?? '');
     $premClientId  = (int)($_POST['premium_client_id'] ?? 0);
 
@@ -66,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
     if (empty($email))     { $err = 'Client email is required.'; goto render; }
 
     $subtotal    = array_sum(array_column($lineItems, 'subtotal'));
-    $discountAmt = $subtotal * ($discountPct / 100);
+    $discountPct = 0; // fixed amount, no percentage
     $total       = $subtotal - $discountAmt;
     $qnum        = generateQuotationNumber();
 
@@ -74,12 +75,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
     $ins = $db->prepare("INSERT INTO final_quotations
         (quotation_number, request_id, customer_name, company_name, email, contact_number,
          is_premium, premium_client_id, prem_address, prem_branch, prem_dear, prem_prepared_by, prem_checked_by,
-         discount_percent, subtotal, discount_amount, total_amount, notes)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
-    $ins->bind_param('siisssiisssssdddds',
+         discount_percent, subtotal, discount_amount, total_amount, notes, location)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
+    $ins->bind_param('siisssiisssssddddss',
         $qnum, $requestId, $custName, $companyName, $email, $phone,
         $isPremium, $premClientId, $premAddress, $premBranch, $premDear, $preparedBy, $checkedBy,
-        $discountPct, $subtotal, $discountAmt, $total, $notes
+        $discountPct, $subtotal, $discountAmt, $total, $notes, $location
     );
     $ins->execute();
     $quotationId = $db->insert_id;
@@ -98,13 +99,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
         'company_name'     => $companyName,
         'email'            => $email,
         'contact_number'   => $phone,
+        'location'         => $location,
         'is_premium'       => $isPremium,
         'prem_address'     => $premAddress,
         'prem_branch'      => $premBranch,
         'prem_dear'        => $premDear,
         'prem_prepared_by' => $preparedBy,
         'prem_checked_by'  => $checkedBy,
-        'discount_percent' => $discountPct,
+        'discount_percent' => 0,
         'discount_amount'  => $discountAmt,
         'subtotal'         => $subtotal,
         'total_amount'     => $total,
@@ -135,7 +137,8 @@ render:
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Create Quotation — <?= SITE_NAME ?> Admin</title>
+  <link rel="icon" type="image/png" href="../assets/pw.png">
+  <title>Printworld</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../assets/css/style.css">
@@ -192,6 +195,10 @@ render:
               <label>Contact Number</label>
               <input type="text" name="contact_number" class="form-control" value="<?= htmlspecialchars($req['contact_number'] ?? '') ?>">
             </div>
+          </div>
+          <div class="form-group">
+            <label>Location / Address</label>
+            <input type="text" name="location" class="form-control" value="<?= htmlspecialchars($req['location'] ?? '') ?>" placeholder="Client's location">
           </div>
           <?php if ($isPremium): ?>
           <div class="form-row">
@@ -269,19 +276,19 @@ render:
         <div class="admin-card-header"><h3>Pricing Summary</h3></div>
         <div style="padding:20px">
           <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:0.9rem">
-            <span style="color:var(--gray-600)">Subtotal</span>
+            <span style="color:var(--gray-600)">Original Price</span>
             <span id="display-subtotal" style="font-weight:700">₱0.00</span>
           </div>
           <div class="form-group">
-            <label>Discount (%)</label>
-            <input type="number" name="discount_percent" id="discount-pct" class="form-control" value="0" min="0" max="100" step="0.5" oninput="calcTotals()">
+            <label>Corporate Discount (₱)</label>
+            <input type="number" name="discount_amount" id="discount-amt" class="form-control" value="0" min="0" step="0.01" oninput="calcTotals()">
           </div>
           <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:0.85rem;color:var(--gray-600)">
-            <span>Discount Amount</span>
+            <span>Corporate Discount</span>
             <span id="display-discount" style="color:#c00">-₱0.00</span>
           </div>
           <div style="border-top:2px solid var(--black);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:0.85rem;font-weight:700;letter-spacing:1px;text-transform:uppercase">Total</span>
+            <span style="font-size:0.85rem;font-weight:700;letter-spacing:1px;text-transform:uppercase">Total Price</span>
             <span id="display-total" style="font-size:1.4rem;font-weight:800">₱0.00</span>
           </div>
         </div>
@@ -351,9 +358,8 @@ function calcTotals() {
     const price = parseFloat(row.querySelector('.item-price')?.value) || 0;
     subtotal += qty * price;
   });
-  const disc    = parseFloat(document.getElementById('discount-pct')?.value) || 0;
-  const discAmt = subtotal * (disc / 100);
-  const total   = subtotal - discAmt;
+  const discAmt = parseFloat(document.getElementById('discount-amt')?.value) || 0;
+  const total   = Math.max(0, subtotal - discAmt);
   document.getElementById('display-subtotal').textContent = '₱' + subtotal.toLocaleString('en-PH', {minimumFractionDigits:2});
   document.getElementById('display-discount').textContent = '-₱' + discAmt.toLocaleString('en-PH', {minimumFractionDigits:2});
   document.getElementById('display-total').textContent    = '₱' + total.toLocaleString('en-PH', {minimumFractionDigits:2});

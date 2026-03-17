@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once '../config.php';
 require_once '../includes/auth.php';
 require_once '../includes/db.php';
@@ -81,7 +81,8 @@ $services = $db->query("SELECT * FROM service_categories ORDER BY category, sort
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Services — <?= SITE_NAME ?> Admin</title>
+  <link rel="icon" type="image/png" href="../assets/pw.png">
+  <title>Printworld</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../assets/css/style.css">

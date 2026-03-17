@@ -2,8 +2,8 @@
 require_once 'config.php';
 require_once 'includes/functions.php';
 
-$heroTitle    = getSiteContent('hero_title', 'Premium Printing Solutions');
-$heroSubtitle = getSiteContent('hero_subtitle', 'Quality prints that make your brand stand out.');
+$heroTitle    = getSiteContent('hero_title', 'Printworld Advertising Services');
+$heroSubtitle = getSiteContent('hero_subtitle', 'Highest in Quality, Lowest in Prices.');
 $aboutTitle   = getSiteContent('about_title', 'About Printworld');
 $aboutText    = getSiteContent('about_text', '');
 $address      = getSiteContent('contact_address', 'Digos City, Davao del Sur');
@@ -19,7 +19,8 @@ $services     = getActiveServices();
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><?= SITE_NAME ?> — Premium Printing Solutions</title>
+  <title>Printworld</title>
+  <link rel="icon" type="image/png" href="assets/pw.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
@@ -30,7 +31,7 @@ $services     = getActiveServices();
 <!-- NAVBAR -->
 <nav class="navbar">
   <div class="nav-inner">
-    <a href="index.php" class="nav-logo"><?= SITE_NAME ?><span>.</span></a>
+    <a href="index.php" class="nav-logo"><img src="assets/pw.png" alt="Printworld Logo" style="height:36px;width:36px;object-fit:contain;border-radius:6px"><?= SITE_NAME ?><span>.</span></a>
     <ul class="nav-links">
       <li><a href="#services">Services</a></li>
       <li><a href="#gallery">Gallery</a></li>
@@ -49,7 +50,7 @@ $services     = getActiveServices();
   <div class="hero-bg"></div>
   <div class="hero-pattern"></div>
   <div class="hero-content">
-    <div class="hero-badge">Professional Printing Services</div>
+    <div class="hero-badge">No. 1 High Quality Signages in Davao del Sur</div>
     <h1><?= htmlspecialchars($heroTitle) ?></h1>
     <p><?= htmlspecialchars($heroSubtitle) ?></p>
     <div class="hero-actions">
@@ -148,7 +149,7 @@ $services     = getActiveServices();
         <a href="quotation.php" class="btn btn-primary" style="margin-top:24px">Get a Quote</a>
         <div class="about-stats">
           <div class="stat-item"><div class="num">500+</div><div class="label">Happy Clients</div></div>
-          <div class="stat-item"><div class="num">10+</div><div class="label">Years Experience</div></div>
+          <div class="stat-item"><div class="num">5+</div><div class="label">Years Experience</div></div>
           <div class="stat-item"><div class="num">1000+</div><div class="label">Projects Done</div></div>
           <div class="stat-item"><div class="num">9</div><div class="label">Services Offered</div></div>
         </div>
@@ -212,13 +213,14 @@ $services     = getActiveServices();
 <footer>
   <div class="container">
     <div class="footer-logo"><?= SITE_NAME ?></div>
-    <p style="margin-bottom:12px">Premium Printing Solutions · Digos City, Davao del Sur</p>
+    <p style="margin-bottom:12px">High in Quality, Lowest in Price! · Digos City, Davao del Sur</p>
     <div class="footer-social">
       <a href="tel:<?= CONTACT_PHONE ?>" title="Call us"><i class="fas fa-phone"></i></a>
       <a href="mailto:<?= CONTACT_EMAIL ?>" title="Email us"><i class="fas fa-envelope"></i></a>
       <a href="<?= CONTACT_FACEBOOK ?>" target="_blank" rel="noopener" title="Facebook Page"><i class="fab fa-facebook-f"></i></a>
     </div>
     <p style="margin-top:16px;font-size:0.78rem">© <?= date('Y') ?> <?= SITE_NAME ?>. All rights reserved.</p>
+    <p style="margin-top:6px;font-size:0.7rem;color:rgba(255,255,255,0.3)">Developed by Ryan Mark Lotarino</p>
     <p style="margin-top:10px">
       <a href="#" onclick="document.getElementById('admin-login-modal').classList.add('open');return false;" style="font-size:0.7rem;color:rgba(255,255,255,0.2);text-decoration:none;letter-spacing:0.5px" onmouseover="this.style.color='rgba(255,255,255,0.5)'" onmouseout="this.style.color='rgba(255,255,255,0.2)'">
         <i class="fas fa-lock" style="font-size:0.65rem;margin-right:4px"></i>Admin

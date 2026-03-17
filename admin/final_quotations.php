@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once '../config.php';
 require_once '../includes/auth.php';
 require_once '../includes/db.php';
@@ -33,7 +33,8 @@ if ($viewId) {
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Quotation <?= htmlspecialchars($q['quotation_number']) ?> — <?= SITE_NAME ?> Admin</title>
+  <link rel="icon" type="image/png" href="../assets/pw.png">
+  <title>Printworld</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../assets/css/style.css">
@@ -94,11 +95,11 @@ if ($viewId) {
     <div class="admin-card" style="margin-bottom:16px">
       <div class="admin-card-header"><h3>Summary</h3></div>
       <div style="padding:4px 0">
-        <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:0.88rem"><span style="color:var(--gray-600)">Subtotal</span><span>₱<?= number_format($q['subtotal'], 2) ?></span></div>
-        <?php if ($q['discount_percent'] > 0): ?>
-        <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:0.88rem"><span style="color:var(--gray-600)">Discount (<?= $q['discount_percent'] ?>%)</span><span style="color:#c00">-₱<?= number_format($q['discount_amount'], 2) ?></span></div>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:0.88rem"><span style="color:var(--gray-600)">Original Price</span><span>₱<?= number_format($q['subtotal'], 2) ?></span></div>
+        <?php if ($q['discount_amount'] > 0): ?>
+        <div style="display:flex;justify-content:space-between;padding:8px 0;font-size:0.88rem"><span style="color:var(--gray-600)">Corporate Discount</span><span style="color:#c00">-₱<?= number_format($q['discount_amount'], 2) ?></span></div>
         <?php endif; ?>
-        <div style="display:flex;justify-content:space-between;padding:12px 0;border-top:2px solid var(--black);margin-top:8px"><span style="font-weight:700;font-size:0.85rem;text-transform:uppercase;letter-spacing:1px">Total</span><span style="font-size:1.3rem;font-weight:800">₱<?= number_format($q['total_amount'], 2) ?></span></div>
+        <div style="display:flex;justify-content:space-between;padding:12px 0;border-top:2px solid var(--black);margin-top:8px"><span style="font-weight:700;font-size:0.85rem;text-transform:uppercase;letter-spacing:1px">Total Price</span><span style="font-size:1.3rem;font-weight:800">₱<?= number_format($q['total_amount'], 2) ?></span></div>
       </div>
     </div>
     <div class="admin-card">
@@ -130,7 +131,8 @@ $quotations = $db->query("SELECT fq.*, qr.request_number FROM final_quotations f
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Final Quotations — <?= SITE_NAME ?> Admin</title>
+  <link rel="icon" type="image/png" href="../assets/pw.png">
+  <title>Printworld</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../assets/css/style.css">
