@@ -6,7 +6,8 @@ class Database {
     private $conn;
 
     private function __construct() {
-        $this->conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+        $host = DB_HOST . (defined('DB_PORT') && DB_PORT != 3306 ? ':' . DB_PORT : '');
+        $this->conn = new mysqli($host, DB_USER, DB_PASS, DB_NAME);
         if ($this->conn->connect_error) {
             die(json_encode(['error' => 'Database connection failed.']));
         }
