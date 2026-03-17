@@ -11,6 +11,7 @@ $customerName  = sanitizeInput($_POST['customer_name'] ?? '');
 $companyName   = sanitizeInput($_POST['company_name'] ?? '');
 $email         = sanitizeInput($_POST['email'] ?? '');
 $contactNumber = sanitizeInput($_POST['contact_number'] ?? '');
+$location      = sanitizeInput($_POST['location'] ?? '');
 $message       = sanitizeInput($_POST['message'] ?? '');
 $itemsData     = $_POST['items_data'] ?? '[]';
 $signLat       = sanitizeInput($_POST['sign_lat'] ?? '');
@@ -42,13 +43,13 @@ $requestNumber = generateRequestNumber();
 
 // Insert quotation request
 $stmt = $db->prepare("INSERT INTO quotation_requests
-    (request_number, customer_name, company_name, email, contact_number, message, items_json, design_file, signage_lat, signage_lng, signage_address)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+    (request_number, customer_name, company_name, email, contact_number, message, location, items_json, design_file, signage_lat, signage_lng, signage_address)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)");
 $lat = $signLat ? (float)$signLat : null;
 $lng = $signLng ? (float)$signLng : null;
-$stmt->bind_param('ssssssssdds',
+$stmt->bind_param('sssssssssdds',
     $requestNumber, $customerName, $companyName, $email, $contactNumber,
-    $message, $itemsData, $designPath, $lat, $lng, $signAddress
+    $message, $location, $itemsData, $designPath, $lat, $lng, $signAddress
 );
 $stmt->execute();
 $requestId = $db->insert_id;
@@ -72,6 +73,7 @@ $requestData = [
     'company_name'   => $companyName,
     'email'          => $email,
     'contact_number' => $contactNumber,
+    'location'       => $location,
     'message'        => $message,
 ];
 $pdfPath = generateRequestPDF($requestData, $items);

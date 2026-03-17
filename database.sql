@@ -64,6 +64,7 @@ CREATE TABLE IF NOT EXISTS quotation_requests (
     message TEXT,
     items_json LONGTEXT NOT NULL,
     design_file VARCHAR(255),
+    location VARCHAR(255),
     signage_lat DECIMAL(10,8),
     signage_lng DECIMAL(11,8),
     signage_address TEXT,
@@ -145,6 +146,7 @@ INSERT IGNORE INTO admins (username, password, email) VALUES
 -- Add columns if upgrading from older schema
 ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS category ENUM('basic','sublimation','signage') DEFAULT 'basic';
 ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS image_path VARCHAR(255) DEFAULT NULL;
+ALTER TABLE quotation_requests ADD COLUMN IF NOT EXISTS location VARCHAR(255) AFTER signage_address;
 
 INSERT IGNORE INTO service_categories (name, slug, description, icon, category, sort_order) VALUES
 -- Basic Services

@@ -82,11 +82,11 @@ $requests = $db->query($sql);
         <tr><td style="color:var(--gray-400)">Email</td><td><a href="mailto:<?= htmlspecialchars($req['email']) ?>"><?= htmlspecialchars($req['email']) ?></a></td></tr>
         <tr><td style="color:var(--gray-400)">Phone</td><td><?= htmlspecialchars($req['contact_number']) ?></td></tr>
         <tr><td style="color:var(--gray-400)">Date</td><td><?= date('F d, Y g:i A', strtotime($req['created_at'])) ?></td></tr>
+        <?php if (!empty($req['location'])): ?>
+        <tr><td style="color:var(--gray-400)">Location</td><td><?= htmlspecialchars($req['location']) ?></td></tr>
+        <?php endif; ?>
         <?php if ($req['message']): ?>
         <tr><td style="color:var(--gray-400)">Message</td><td><?= nl2br(htmlspecialchars($req['message'])) ?></td></tr>
-        <?php endif; ?>
-        <?php if ($req['signage_address']): ?>
-        <tr><td style="color:var(--gray-400)">Location</td><td><?= htmlspecialchars($req['signage_address']) ?></td></tr>
         <?php endif; ?>
         <?php if ($req['design_file']): ?>
         <tr><td style="color:var(--gray-400)">Design File</td><td><a href="../<?= htmlspecialchars($req['design_file']) ?>" target="_blank" class="action-btn"><i class="fas fa-file"></i> View File</a></td></tr>

@@ -30,6 +30,7 @@ function sendAdminNotification(array $req, array $items, string $pdfPath): bool 
         $company = htmlspecialchars($req['company_name'] ?? '—');
         $email   = htmlspecialchars($req['email'] ?? '');
         $phone   = htmlspecialchars($req['contact_number'] ?? '');
+        $location = htmlspecialchars($req['location'] ?? '—');
         $rnum    = htmlspecialchars($req['request_number'] ?? '');
         $msg     = htmlspecialchars($req['message'] ?? '');
         $site    = SITE_NAME;
@@ -56,6 +57,7 @@ function sendAdminNotification(array $req, array $items, string $pdfPath): bool 
               <tr><td style="padding:6px 0;color:#888;font-size:12px;">Company</td><td>{$company}</td></tr>
               <tr><td style="padding:6px 0;color:#888;font-size:12px;">Email</td><td>{$email}</td></tr>
               <tr><td style="padding:6px 0;color:#888;font-size:12px;">Phone</td><td>{$phone}</td></tr>
+              <tr><td style="padding:6px 0;color:#888;font-size:12px;">Location</td><td>{$location}</td></tr>
               <tr><td style="padding:6px 0;color:#888;font-size:12px;">Message</td><td>{$msg}</td></tr>
             </table>
             <table style="width:100%;border-collapse:collapse;">

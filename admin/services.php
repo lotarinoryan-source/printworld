@@ -54,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$error) {
             if ($imgPath) {
                 $stmt = $db->prepare("UPDATE service_categories SET name=?,description=?,icon=?,category=?,is_active=?,image_path=? WHERE id=?");
-                $stmt->bind_param('ssssiisi', $name, $desc, $icon, $cat, $active, $imgPath, $id);
+                $stmt->bind_param('ssssisi', $name, $desc, $icon, $cat, $active, $imgPath, $id);
             } else {
                 $stmt = $db->prepare("UPDATE service_categories SET name=?,description=?,icon=?,category=?,is_active=? WHERE id=?");
                 $stmt->bind_param('ssssii', $name, $desc, $icon, $cat, $active, $id);
@@ -68,10 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute() ? $success = 'Service deleted.' : $error = 'Delete failed.';
     } elseif ($action === 'remove_image') {
         $id = (int)$_POST['id'];
-        $db->prepare("UPDATE service_categories SET image_path=NULL WHERE id=?")->bind_param('i', $id);
-        $db->prepare("UPDATE service_categories SET image_path=NULL WHERE id=?")->execute();
         $s = $db->prepare("UPDATE service_categories SET image_path=NULL WHERE id=?");
-        $s->bind_param('i', $id); $s->execute();
+        $s->bind_param('i', $id);
+        $s->execute();
         $success = 'Image removed.';
     }
 }
