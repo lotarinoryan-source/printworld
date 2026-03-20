@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
     $premDear     = sanitizeInput($_POST['prem_dear'] ?? '');
     $preparedBy   = sanitizeInput($_POST['prem_prepared_by'] ?? 'Nino S. Del Rosario');
     $checkedBy    = sanitizeInput($_POST['prem_checked_by'] ?? 'Ryan Mark R. Lotarino');
-    $discountPct  = (float)($_POST['discount_percent'] ?? 0);
+    $discountAmt  = (float)($_POST['discount_amount'] ?? 0);
     $notes        = sanitizeInput($_POST['notes'] ?? '');
     $premClientId = (int)($_POST['premium_client_id'] ?? 0);
 
@@ -51,7 +51,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
     if (empty($email))     { $err = 'Client email is required.'; goto render; }
 
     $subtotal    = array_sum(array_column($lineItems, 'subtotal'));
-    $discountAmt = $subtotal * ($discountPct / 100);
     $total       = $subtotal - $discountAmt;
     $qnum = generateQuotationNumber();
 
@@ -92,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
         'prem_dear'        => $premDear,
         'prem_prepared_by' => $preparedBy,
         'prem_checked_by'  => $checkedBy,
-        'discount_percent' => $discountPct,
+        'discount_percent' => 0,
         'discount_amount'  => $discountAmt,
         'subtotal'         => $subtotal,
         'total_amount'     => $total,
@@ -243,19 +242,19 @@ render:?>
         <div style="padding:20px">
           <div style="display:flex;justify-content:space-between;margin-bottom:12px;font-size:0.9rem">
             <span style="color:var(--gray-600)">Subtotal</span>
-            <span id="display-subtotal" style="font-weight:700">P0.00</span>
+            <span id="display-subtotal" style="font-weight:700">₱0.00</span>
           </div>
           <div class="form-group">
-            <label>Discount (%)</label>
-            <input type="number" name="discount_percent" id="discount-pct" class="form-control" value="0" min="0" max="100" step="0.5" oninput="calcTotals()">
+            <label>Corporate Discount (₱)</label>
+            <input type="number" name="discount_amount" id="discount-amt" class="form-control" value="0" min="0" step="0.01" oninput="calcTotals()">
           </div>
           <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:0.85rem;color:var(--gray-600)">
-            <span>Discount Amount</span>
-            <span id="display-discount" style="color:#c00">-P0.00</span>
+            <span>Corporate Discount</span>
+            <span id="display-discount" style="color:#c00">-₱0.00</span>
           </div>
           <div style="border-top:2px solid var(--black);padding-top:12px;display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:0.85rem;font-weight:700;letter-spacing:1px;text-transform:uppercase">Total</span>
-            <span id="display-total" style="font-size:1.4rem;font-weight:800">P0.00</span>
+            <span id="display-total" style="font-size:1.4rem;font-weight:800">₱0.00</span>
           </div>
         </div>
       </div>
@@ -329,12 +328,11 @@ function calcTotals() {
     var price = parseFloat(row.querySelector('.item-price').value) || 0;
     subtotal += qty * price;
   });
-  var disc    = parseFloat(document.getElementById('discount-pct').value) || 0;
-  var discAmt = subtotal * (disc / 100);
+  var discAmt = parseFloat(document.getElementById('discount-amt').value) || 0;
   var total   = subtotal - discAmt;
-  document.getElementById('display-subtotal').textContent = 'P' + subtotal.toLocaleString('en-PH', {minimumFractionDigits:2});
-  document.getElementById('display-discount').textContent = '-P' + discAmt.toLocaleString('en-PH', {minimumFractionDigits:2});
-  document.getElementById('display-total').textContent    = 'P' + total.toLocaleString('en-PH', {minimumFractionDigits:2});
+  document.getElementById('display-subtotal').textContent = '₱' + subtotal.toLocaleString('en-PH', {minimumFractionDigits:2});
+  document.getElementById('display-discount').textContent = '-₱' + discAmt.toLocaleString('en-PH', {minimumFractionDigits:2});
+  document.getElementById('display-total').textContent    = '₱' + total.toLocaleString('en-PH', {minimumFractionDigits:2});
 }
 calcTotals();
 </script>

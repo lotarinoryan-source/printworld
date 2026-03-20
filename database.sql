@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS premium_clients (
 -- ===================== DEFAULT DATA =====================
 
 INSERT IGNORE INTO admins (username, password, email) VALUES
-('adminprintworld', '$2y$10$HjAkd8segBMSIiOBhgt10.c4rc77uDIv4xqAN0Ds2DzIrlnheM4Nq', 'digosprinting@gmail.com');
+('adminprintworld', '$2y$10$mtmThzto5pyg3Pneb82vzu/sTCm9rPht/XDLHr3jXqHZsAJInwxY.', 'digosprinting@gmail.com');
 
 -- Add columns if upgrading from older schema
 ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS category ENUM('basic','sublimation','signage') DEFAULT 'basic';
