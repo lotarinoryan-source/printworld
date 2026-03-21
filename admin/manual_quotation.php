@@ -10,6 +10,8 @@ requireAdmin();
 
 $db = db();
 $premiumClients = getPremiumClients();
+// Load full premium client data for JS autofill
+$premClientsFull = $db->query('SELECT * FROM premium_clients WHERE is_active=1 ORDER BY company_name')->fetch_all(MYSQLI_ASSOC);
 $err = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
@@ -26,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
     $discountAmt  = (float)($_POST['discount_amount'] ?? 0);
     $notes        = sanitizeInput($_POST['notes'] ?? '');
     $premClientId = (int)($_POST['premium_client_id'] ?? 0);
+    $premTnc      = sanitizeInput($_POST['prem_tnc'] ?? '');
 
     $lineItems    = [];
     $descriptions = $_POST['item_desc']  ?? [];
@@ -60,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
          prem_prepared_by, prem_checked_by, discount_percent, subtotal,
          discount_amount, total_amount, notes)
         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+    $discountPct = 0;
     $ins->bind_param('sssssiisssssdddds',
         $qnum, $custName, $companyName, $email, $phone,
         $isPremium, $premClientId, $premAddress, $premBranch, $premDear,
@@ -95,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['generate'])) {
         'discount_amount'  => $discountAmt,
         'subtotal'         => $subtotal,
         'total_amount'     => $total,
+        'terms_conditions' => $premTnc,
     ];
     $pdfPath = generateQuotationPDF($qData, $lineItems);
 
@@ -112,7 +117,7 @@ render:?>
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" type="image/png" href="../assets/pw.png">
-  <title>Printworld</title>
+  <title>Printworld - Manual Quotation</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../assets/css/style.css">
@@ -140,10 +145,8 @@ render:?>
       <label style="font-size:0.8rem;color:var(--gray-400)">Select Client:</label>
       <select id="premium-client-select" class="form-control" style="width:200px" onchange="fillPremiumClient(this)">
         <option value="">— Select —</option>
-        <?php foreach ($premiumClients as $pc): ?>
-        <option value="<?= $pc['id'] ?>"
-          data-name="<?= htmlspecialchars($pc['company_name']) ?>"
-          data-addr="<?= htmlspecialchars($pc['address']) ?>">
+        <?php foreach ($premClientsFull as $pc): ?>
+        <option value="<?= $pc['id'] ?>" data-client='<?= htmlspecialchars(json_encode($pc), ENT_QUOTES) ?>'>
           <?= htmlspecialchars($pc['company_name']) ?>
         </option>
         <?php endforeach; ?>
@@ -165,7 +168,7 @@ render:?>
           <div class="form-row">
             <div class="form-group">
               <label>Client Name *</label>
-              <input type="text" name="customer_name" class="form-control" required>
+              <input type="text" name="customer_name" id="field-custname" class="form-control" required>
             </div>
             <div class="form-group">
               <label>Company Name</label>
@@ -175,11 +178,11 @@ render:?>
           <div class="form-row">
             <div class="form-group">
               <label>Email *</label>
-              <input type="email" name="email" class="form-control" required>
+              <input type="email" name="email" id="field-email" class="form-control" required>
             </div>
             <div class="form-group">
               <label>Contact Number</label>
-              <input type="text" name="contact_number" class="form-control">
+              <input type="text" name="contact_number" id="field-phone" class="form-control">
             </div>
           </div>
           <div class="form-row">
@@ -189,12 +192,12 @@ render:?>
             </div>
             <div class="form-group">
               <label>Branch</label>
-              <input type="text" name="prem_branch" class="form-control" placeholder="e.g. Branch name / location">
+              <input type="text" name="prem_branch" id="field-branch" class="form-control" placeholder="e.g. Branch name / location">
             </div>
           </div>
           <div class="form-group">
             <label>Dear (Recipient Name)</label>
-            <input type="text" name="prem_dear" class="form-control" placeholder="e.g. Ms. Eva">
+            <input type="text" name="prem_dear" id="field-dear" class="form-control" placeholder="e.g. Ms. Eva">
           </div>
         </div>
       </div>
@@ -232,6 +235,17 @@ render:?>
         <div class="admin-card-header"><h3>Notes</h3></div>
         <div style="padding:20px">
           <textarea name="notes" class="form-control" rows="3" placeholder="Internal notes (not shown on PDF)..."></textarea>
+        </div>
+      </div>
+
+      <div class="admin-card" id="tnc-card" style="margin-top:20px">
+        <div class="admin-card-header">
+          <h3>Terms &amp; Conditions</h3>
+          <span id="tnc-hint" style="font-size:0.75rem;color:var(--gray-400)"></span>
+        </div>
+        <div style="padding:20px">
+          <textarea name="prem_tnc" id="prem-tnc-val" class="form-control" rows="8" placeholder="Enter Terms &amp; Conditions for this quotation..."></textarea>
+          <p style="font-size:0.75rem;color:var(--gray-400);margin-top:6px">For premium clients, this is auto-filled from their profile. You can still edit it for this quotation only.</p>
         </div>
       </div>
     </div>
@@ -290,13 +304,30 @@ function setType(isPremium) {
   document.getElementById('is-premium-val').value = isPremium;
   var sel = document.getElementById('premium-selector');
   sel.style.display = isPremium ? 'flex' : 'none';
-  if (!isPremium) document.getElementById('premium-client-id-val').value = 0;
+  if (!isPremium) {
+    document.getElementById('premium-client-id-val').value = 0;
+    document.getElementById('prem-tnc-val').value = '';
+    document.getElementById('tnc-hint').textContent = '';
+  }
 }
 function fillPremiumClient(sel) {
   var opt = sel.options[sel.selectedIndex];
-  document.getElementById('field-company').value = opt.dataset.name || '';
-  document.getElementById('field-address').value = opt.dataset.addr || '';
-  document.getElementById('premium-client-id-val').value = sel.value || 0;
+  if (!opt.value) {
+    document.getElementById('prem-tnc-val').value = '';
+    document.getElementById('tnc-hint').textContent = '';
+    return;
+  }
+  var c = JSON.parse(opt.dataset.client || '{}');
+  document.getElementById('field-custname').value        = c.contact_person || '';
+  document.getElementById('field-company').value         = c.company_name || '';
+  document.getElementById('field-email').value           = c.email || '';
+  document.getElementById('field-phone').value           = c.phone || '';
+  document.getElementById('field-address').value         = c.address || '';
+  document.getElementById('field-branch').value          = c.branch || '';
+  document.getElementById('field-dear').value            = c.dear || '';
+  document.getElementById('premium-client-id-val').value = c.id || 0;
+  document.getElementById('prem-tnc-val').value          = c.terms_conditions || '';
+  document.getElementById('tnc-hint').textContent        = 'Auto-filled from ' + (c.company_name || 'client');
 }
 function addRow() {
   var tbody = document.getElementById('items-body');

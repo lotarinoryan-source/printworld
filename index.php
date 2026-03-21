@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once 'config.php';
 require_once 'includes/functions.php';
 
@@ -19,7 +19,7 @@ $services     = getActiveServices();
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Printworld</title>
+  <title>Printworld - Home</title>
   <link rel="icon" type="image/png" href="assets/pw.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap" rel="stylesheet">
@@ -201,7 +201,7 @@ $services     = getActiveServices();
       </div>
       <div class="contact-map">
         <iframe
-          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31574.5!2d125.3573!3d6.7497!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x32f8c4e1b1b1b1b1%3A0x0!2sDigos+City%2C+Davao+del+Sur!5e0!3m2!1sen!2sph!4v1"
+          src="https://www.google.com/maps/embed/v1/search?key=<?= GOOGLE_MAPS_API_KEY ?>&q=Printworld+Multimedia+%26+Services+Digos+City"
           allowfullscreen loading="lazy" referrerpolicy="no-referrer-when-downgrade">
         </iframe>
       </div>

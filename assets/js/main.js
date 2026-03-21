@@ -11,13 +11,21 @@ window.addEventListener('scroll', () => {
   }
 });
 
-navToggle?.addEventListener('click', () => {
+navToggle?.addEventListener('click', (e) => {
+  e.stopPropagation();
   navLinks?.classList.toggle('open');
 });
 
 // Close nav on link click
 document.querySelectorAll('.nav-links a').forEach(link => {
   link.addEventListener('click', () => navLinks?.classList.remove('open'));
+});
+
+// Close nav when clicking outside
+document.addEventListener('click', (e) => {
+  if (navLinks?.classList.contains('open') && !navLinks.contains(e.target) && e.target !== navToggle) {
+    navLinks.classList.remove('open');
+  }
 });
 
 // ===== SMOOTH SCROLL =====

@@ -21,12 +21,12 @@ $catLabel  = $catLabels[$svc['category'] ?? 'basic'] ?? 'Services';
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" type="image/png" href="assets/pw.png">
-<title>Printworld</title>
+<title>Printworld - Services</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="assets/css/style.css">
   <style>
-    .svc-hero { background:#111; color:#fff; padding:60px 0 40px; }
+    .svc-hero { background:#111; color:#fff; padding:80px 0 40px; }
     .svc-hero .breadcrumb { font-size:0.8rem; color:rgba(255,255,255,0.4); margin-bottom:12px; }
     .svc-hero .breadcrumb a { color:rgba(255,255,255,0.4); text-decoration:none; }
     .svc-hero .breadcrumb a:hover { color:#fff; }
@@ -38,20 +38,36 @@ $catLabel  = $catLabels[$svc['category'] ?? 'basic'] ?? 'Services';
     .svc-no-image { text-align:center; padding:80px 40px; color:#aaa; }
     .svc-no-image i { font-size:3rem; margin-bottom:16px; display:block; }
     .svc-cta { text-align:center; margin-top:48px; }
+    @media(max-width:768px){
+      .svc-hero { padding:90px 0 32px; }
+      .svc-hero h1 { font-size:1.6rem; }
+      .svc-body { padding:40px 0; }
+      .svc-no-image { padding:48px 24px; }
+    }
+    @media(max-width:480px){
+      .svc-hero h1 { font-size:1.3rem; }
+      .svc-hero p { font-size:.9rem; }
+    }
   </style>
 </head>
 <body>
 
 <!-- NAV -->
 <nav class="navbar" id="navbar">
-  <div class="container nav-container">
-    <a href="index.php" class="nav-logo"><?= SITE_NAME ?></a>
-    <div class="nav-links">
-      <a href="index.php#services">Services</a>
-      <a href="index.php#gallery">Gallery</a>
-      <a href="index.php#about">About</a>
-      <a href="index.php#contact">Contact</a>
-      <a href="quotation.php" class="btn btn-dark btn-sm">Get a Quote</a>
+  <div class="nav-inner">
+    <a href="index.php" class="nav-logo">
+      <img src="assets/pw.png" alt="Printworld Logo" style="height:36px;width:36px;object-fit:contain;border-radius:6px">
+      <?= SITE_NAME ?><span>.</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="index.php#services">Services</a></li>
+      <li><a href="index.php#gallery">Gallery</a></li>
+      <li><a href="index.php#about">About</a></li>
+      <li><a href="index.php#contact">Contact</a></li>
+      <li><a href="quotation.php" class="nav-cta">Request Quote</a></li>
+    </ul>
+    <div class="nav-toggle" aria-label="Toggle menu">
+      <span></span><span></span><span></span>
     </div>
   </div>
 </nav>
@@ -86,8 +102,10 @@ $catLabel  = $catLabels[$svc['category'] ?? 'basic'] ?? 'Services';
 
     <div class="svc-cta">
       <p style="color:#666;margin-bottom:20px;font-size:0.95rem">Interested in this service? Request a quotation now.</p>
-      <a href="quotation.php" class="btn btn-dark"><i class="fas fa-file-invoice"></i> Request a Quotation</a>
-      <a href="index.php#services" class="btn btn-outline" style="margin-left:12px;color:#111;border-color:#ccc"><i class="fas fa-arrow-left"></i> Back to Services</a>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <a href="quotation.php" class="btn btn-dark"><i class="fas fa-file-invoice"></i> Request a Quotation</a>
+        <a href="index.php#services" class="btn btn-outline" style="color:#111;border-color:#ccc"><i class="fas fa-arrow-left"></i> Back to Services</a>
+      </div>
     </div>
   </div>
 </div>

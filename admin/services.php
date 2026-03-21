@@ -9,6 +9,10 @@ requireAdmin();
 $db = db();
 $success = $error = '';
 
+// Load all signage type/light options for JS
+$signageTypesAll  = $db->query("SELECT * FROM signage_type_options ORDER BY service_slug, sort_order")->fetch_all(MYSQLI_ASSOC);
+$signageLightsAll = $db->query("SELECT * FROM signage_light_options ORDER BY service_slug, id")->fetch_all(MYSQLI_ASSOC);
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -21,7 +25,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($name && $slug) {
             $stmt = $db->prepare("INSERT INTO service_categories (name, slug, description, icon, category) VALUES (?,?,?,?,?)");
             $stmt->bind_param('sssss', $name, $slug, $desc, $icon, $cat);
-            $stmt->execute() ? $success = 'Service added.' : $error = 'Slug already exists.';
+            if ($stmt->execute()) {
+                $success = 'Service added.';
+                // Save signage options if signage category
+                if ($cat === 'signage') {
+                    _saveSignageOptions($db, $slug, $_POST);
+                }
+            } else {
+                $error = 'Slug already exists.';
+            }
         }
     } elseif ($action === 'edit') {
         $id     = (int)$_POST['id'];
@@ -59,7 +71,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $db->prepare("UPDATE service_categories SET name=?,description=?,icon=?,category=?,is_active=? WHERE id=?");
                 $stmt->bind_param('ssssii', $name, $desc, $icon, $cat, $active, $id);
             }
-            $stmt->execute() ? $success = 'Service updated.' : $error = 'Update failed.';
+            if ($stmt->execute()) {
+                $success = 'Service updated.';
+                // Get slug for this service
+                $sr = $db->prepare("SELECT slug FROM service_categories WHERE id=?");
+                $sr->bind_param('i', $id); $sr->execute();
+                $slugRow = $sr->get_result()->fetch_assoc();
+                if ($slugRow && $cat === 'signage') {
+                    _saveSignageOptions($db, $slugRow['slug'], $_POST);
+                }
+            } else {
+                $error = 'Update failed.';
+            }
         }
     } elseif ($action === 'delete') {
         $id = (int)$_POST['id'];
@@ -76,13 +99,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $services = $db->query("SELECT * FROM service_categories ORDER BY category, sort_order, id");
+
+// Reload signage options after any POST changes
+$signageTypesAll  = $db->query("SELECT * FROM signage_type_options ORDER BY service_slug, sort_order")->fetch_all(MYSQLI_ASSOC);
+$signageLightsAll = $db->query("SELECT * FROM signage_light_options ORDER BY service_slug, id")->fetch_all(MYSQLI_ASSOC);
+
+function _saveSignageOptions($db, $slug, $post) {
+    // Replace type options
+    $st = $db->prepare("DELETE FROM signage_type_options WHERE service_slug=?");
+    $st->bind_param('s', $slug); $st->execute();
+    $types = array_filter(array_map('trim', explode("\n", $post['signage_types'] ?? '')));
+    $ins = $db->prepare("INSERT IGNORE INTO signage_type_options (service_slug,type_label,sort_order) VALUES (?,?,?)");
+    foreach (array_values($types) as $i => $t) {
+        $ins->bind_param('ssi', $slug, $t, $i); $ins->execute();
+    }
+    // Replace light options
+    $sl = $db->prepare("DELETE FROM signage_light_options WHERE service_slug=?");
+    $sl->bind_param('s', $slug); $sl->execute();
+    $lights = $_POST['signage_lights'] ?? [];
+    $insl = $db->prepare("INSERT IGNORE INTO signage_light_options (service_slug,light_label) VALUES (?,?)");
+    foreach ($lights as $l) {
+        $l = trim($l);
+        if ($l) { $insl->bind_param('ss', $slug, $l); $insl->execute(); }
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" type="image/png" href="../assets/pw.png">
-  <title>Printworld</title>
+  <title>Printworld - Services</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../assets/css/style.css">
@@ -138,21 +185,50 @@ $services = $db->query("SELECT * FROM service_categories ORDER BY category, sort
 
 <!-- Add Modal -->
 <div id="add-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;overflow-y:auto;padding:20px">
-  <div style="background:#fff;padding:32px;width:100%;max-width:480px;border-radius:6px">
+  <div style="background:#fff;padding:32px;width:100%;max-width:520px;border-radius:6px">
     <h3 style="margin-bottom:20px">Add Service</h3>
     <form method="POST">
       <input type="hidden" name="action" value="add">
       <div class="form-group"><label>Category</label>
-        <select name="category" class="form-control">
+        <select name="category" id="add-category" class="form-control" onchange="toggleSignageConfig('add',this.value)">
           <option value="basic">Basic Services</option>
           <option value="sublimation">Sublimation Services</option>
           <option value="signage">Signage Services</option>
         </select>
       </div>
-      <div class="form-group"><label>Name *</label><input type="text" name="name" class="form-control" required></div>
-      <div class="form-group"><label>Slug (URL key) *</label><input type="text" name="slug" class="form-control" required placeholder="e.g. mug-printing"></div>
+      <div class="form-group"><label>Name *</label><input type="text" name="name" id="add-name" class="form-control" required oninput="autoSuggestIcon('add',this.value);autoSlug(this.value)"></div>
+      <div class="form-group"><label>Slug (URL key) *</label><input type="text" name="slug" id="add-slug" class="form-control" required placeholder="e.g. mug-printing"></div>
       <div class="form-group"><label>Description</label><textarea name="description" class="form-control" rows="2"></textarea></div>
-      <div class="form-group"><label>Icon (FontAwesome)</label><input type="text" name="icon" class="form-control" value="fa-print"></div>
+      <div class="form-group">
+        <label>Icon (FontAwesome)</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="text" name="icon" id="add-icon" class="form-control" value="fa-sign-hanging" oninput="updateIconPreview('add',this.value)" style="flex:1">
+          <span id="add-icon-preview" style="font-size:1.5rem;width:32px;text-align:center;color:#333"><i class="fas fa-sign-hanging"></i></span>
+        </div>
+        <p style="font-size:0.72rem;color:#aaa;margin-top:3px">Auto-suggested from name. You can change it manually.</p>
+      </div>
+
+      <!-- Signage Config (shown only when category=signage) -->
+      <div id="add-signage-config" style="display:none;border-top:1px solid #eee;padding-top:16px;margin-top:8px">
+        <p style="font-size:0.82rem;font-weight:700;margin-bottom:12px;color:#555"><i class="fas fa-sliders" style="margin-right:6px"></i>Signage Configuration</p>
+        <div class="form-group">
+          <label>Signage Type Options <small style="font-weight:400;color:#aaa">(one per line)</small></label>
+          <textarea name="signage_types" class="form-control" rows="5" placeholder="Double Face&#10;Single Face&#10;Single Frame&#10;Double Face Frame&#10;Special Design"></textarea>
+          <p style="font-size:0.75rem;color:#888;margin-top:4px">Each line = one option in the client dropdown.</p>
+        </div>
+        <div class="form-group">
+          <label>Allowed Light Options</label>
+          <div style="display:flex;gap:20px;margin-top:6px">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer">
+              <input type="checkbox" name="signage_lights[]" value="Lighted" checked> Lighted
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer">
+              <input type="checkbox" name="signage_lights[]" value="Non-lighted" checked> Non-lighted
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div style="display:flex;gap:12px;margin-top:8px">
         <button type="submit" class="btn btn-dark">Add Service</button>
         <button type="button" class="action-btn" onclick="document.getElementById('add-modal').style.display='none'">Cancel</button>
@@ -163,13 +239,13 @@ $services = $db->query("SELECT * FROM service_categories ORDER BY category, sort
 
 <!-- Edit Modal -->
 <div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;overflow-y:auto;padding:20px">
-  <div style="background:#fff;padding:32px;width:100%;max-width:480px;border-radius:6px">
+  <div style="background:#fff;padding:32px;width:100%;max-width:520px;border-radius:6px">
     <h3 style="margin-bottom:20px">Edit Service</h3>
     <form method="POST" enctype="multipart/form-data">
       <input type="hidden" name="action" value="edit">
       <input type="hidden" name="id" id="edit-id">
       <div class="form-group"><label>Category</label>
-        <select name="category" id="edit-category" class="form-control">
+        <select name="category" id="edit-category" class="form-control" onchange="toggleSignageConfig('edit',this.value)">
           <option value="basic">Basic Services</option>
           <option value="sublimation">Sublimation Services</option>
           <option value="signage">Signage Services</option>
@@ -177,13 +253,41 @@ $services = $db->query("SELECT * FROM service_categories ORDER BY category, sort
       </div>
       <div class="form-group"><label>Name *</label><input type="text" name="name" id="edit-name" class="form-control" required></div>
       <div class="form-group"><label>Description</label><textarea name="description" id="edit-desc" class="form-control" rows="2"></textarea></div>
-      <div class="form-group"><label>Icon (FontAwesome)</label><input type="text" name="icon" id="edit-icon" class="form-control"></div>
+      <div class="form-group">
+        <label>Icon (FontAwesome)</label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="text" name="icon" id="edit-icon" class="form-control" oninput="updateIconPreview('edit',this.value)" style="flex:1">
+          <span id="edit-icon-preview" style="font-size:1.5rem;width:32px;text-align:center;color:#333"><i class="fas fa-print"></i></span>
+        </div>
+      </div>
       <div class="form-group"><label>Status</label>
         <select name="is_active" id="edit-active" class="form-control">
           <option value="1">Active</option>
           <option value="0">Inactive</option>
         </select>
       </div>
+
+      <!-- Signage Config (shown only when category=signage) -->
+      <div id="edit-signage-config" style="display:none;border-top:1px solid #eee;padding-top:16px;margin-top:8px">
+        <p style="font-size:0.82rem;font-weight:700;margin-bottom:12px;color:#555"><i class="fas fa-sliders" style="margin-right:6px"></i>Signage Configuration</p>
+        <div class="form-group">
+          <label>Signage Type Options <small style="font-weight:400;color:#aaa">(one per line)</small></label>
+          <textarea name="signage_types" id="edit-signage-types" class="form-control" rows="5"></textarea>
+          <p style="font-size:0.75rem;color:#888;margin-top:4px">Each line = one option in the client dropdown.</p>
+        </div>
+        <div class="form-group">
+          <label>Allowed Light Options</label>
+          <div style="display:flex;gap:20px;margin-top:6px">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer">
+              <input type="checkbox" name="signage_lights[]" id="edit-light-lighted" value="Lighted"> Lighted
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer">
+              <input type="checkbox" name="signage_lights[]" id="edit-light-nonlighted" value="Non-lighted"> Non-lighted
+            </label>
+          </div>
+        </div>
+      </div>
+
       <div class="form-group">
         <label>Service Image</label>
         <div id="edit-current-img" style="margin-bottom:8px"></div>
@@ -199,6 +303,21 @@ $services = $db->query("SELECT * FROM service_categories ORDER BY category, sort
 </div>
 
 <script>
+// Signage options from DB (keyed by slug)
+var signageTypesDB = {};
+var signageLightsDB = {};
+<?php
+$stMap = []; foreach ($signageTypesAll  as $r) $stMap[$r['service_slug']][] = $r['type_label'];
+$slMap = []; foreach ($signageLightsAll as $r) $slMap[$r['service_slug']][] = $r['light_label'];
+echo 'signageTypesDB  = ' . json_encode($stMap) . ";\n";
+echo 'signageLightsDB = ' . json_encode($slMap) . ";\n";
+?>
+
+function toggleSignageConfig(prefix, cat) {
+  var el = document.getElementById(prefix + '-signage-config');
+  if (el) el.style.display = (cat === 'signage') ? 'block' : 'none';
+}
+
 function editService(svc) {
   document.getElementById('edit-id').value       = svc.id;
   document.getElementById('edit-category').value = svc.category || 'basic';
@@ -206,6 +325,18 @@ function editService(svc) {
   document.getElementById('edit-desc').value     = svc.description || '';
   document.getElementById('edit-icon').value     = svc.icon || 'fa-print';
   document.getElementById('edit-active').value   = svc.is_active;
+
+  // Signage config
+  toggleSignageConfig('edit', svc.category);
+  if (svc.category === 'signage') {
+    var slug = svc.slug;
+    var types  = signageTypesDB[slug]  || [];
+    var lights = signageLightsDB[slug] || [];
+    document.getElementById('edit-signage-types').value = types.join('\n');
+    document.getElementById('edit-light-lighted').checked    = lights.indexOf('Lighted') !== -1;
+    document.getElementById('edit-light-nonlighted').checked = lights.indexOf('Non-lighted') !== -1;
+  }
+
   var imgDiv = document.getElementById('edit-current-img');
   if (svc.image_path) {
     imgDiv.innerHTML = '<img src="../' + svc.image_path + '" style="height:60px;border-radius:4px;border:1px solid #eee;margin-bottom:4px"><br>'
@@ -214,9 +345,71 @@ function editService(svc) {
     imgDiv.innerHTML = '<small style="color:#aaa">No image yet</small>';
   }
   document.getElementById('edit-modal').style.display = 'flex';
+  updateIconPreview('edit', svc.icon || 'fa-print');
 }
 document.getElementById('add-modal').addEventListener('click', function(e){ if(e.target===this) this.style.display='none'; });
 document.getElementById('edit-modal').addEventListener('click', function(e){ if(e.target===this) this.style.display='none'; });
+
+// ── Auto-slug from name ──────────────────────────────────────────────────────
+function autoSlug(name) {
+  var slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  document.getElementById('add-slug').value = slug;
+}
+
+// ── Icon keyword map ─────────────────────────────────────────────────────────
+var iconMap = [
+  { keys: ['mug','cup','tumbler'],                icon: 'fa-mug-hot' },
+  { keys: ['keychain','key chain','keytag'],       icon: 'fa-key' },
+  { keys: ['tarpaulin','tarp','streamer'],         icon: 'fa-image' },
+  { keys: ['shirt','t-shirt','tshirt','polo'],     icon: 'fa-shirt' },
+  { keys: ['jersey'],                              icon: 'fa-person-running' },
+  { keys: ['jacket','hoodie'],                     icon: 'fa-vest' },
+  { keys: ['neon'],                                icon: 'fa-lightbulb' },
+  { keys: ['acrylic'],                             icon: 'fa-layer-group' },
+  { keys: ['stainless','steel','metal'],           icon: 'fa-circle-dot' },
+  { keys: ['panaflex','flex'],                     icon: 'fa-rectangle-ad' },
+  { keys: ['billboard'],                           icon: 'fa-rectangle-ad' },
+  { keys: ['signage','sign'],                      icon: 'fa-sign-hanging' },
+  { keys: ['banner'],                              icon: 'fa-flag' },
+  { keys: ['frame','framing'],                     icon: 'fa-border-all' },
+  { keys: ['photo','picture','portrait'],          icon: 'fa-camera' },
+  { keys: ['sticker','decal','vinyl'],             icon: 'fa-star' },
+  { keys: ['id','card','lace'],                    icon: 'fa-id-card' },
+  { keys: ['notebook','journal'],                  icon: 'fa-book' },
+  { keys: ['calendar'],                            icon: 'fa-calendar' },
+  { keys: ['bag','tote','pouch'],                  icon: 'fa-bag-shopping' },
+  { keys: ['umbrella'],                            icon: 'fa-umbrella' },
+  { keys: ['pen','ballpen','pencil'],              icon: 'fa-pen' },
+  { keys: ['cap','hat'],                           icon: 'fa-hat-cowboy' },
+  { keys: ['pillow','cushion'],                    icon: 'fa-couch' },
+  { keys: ['canvas'],                              icon: 'fa-palette' },
+  { keys: ['sublimation'],                         icon: 'fa-fire' },
+  { keys: ['print','printing'],                    icon: 'fa-print' },
+];
+
+function suggestIcon(name) {
+  var lower = name.toLowerCase();
+  for (var i = 0; i < iconMap.length; i++) {
+    for (var j = 0; j < iconMap[i].keys.length; j++) {
+      if (lower.indexOf(iconMap[i].keys[j]) !== -1) return iconMap[i].icon;
+    }
+  }
+  return null;
+}
+
+function autoSuggestIcon(prefix, name) {
+  var icon = suggestIcon(name);
+  if (icon) {
+    document.getElementById(prefix + '-icon').value = icon;
+    updateIconPreview(prefix, icon);
+  }
+}
+
+function updateIconPreview(prefix, icon) {
+  var clean = icon.replace(/^fas?\s+/, '').trim();
+  var el = document.getElementById(prefix + '-icon-preview');
+  if (el) el.innerHTML = '<i class="fas ' + clean + '"></i>';
+}
 </script>
 </body>
 </html>

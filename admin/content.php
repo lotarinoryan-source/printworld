@@ -30,16 +30,15 @@ $fields = [
     'Hero Section'        => ['hero_title' => 'Hero Title', 'hero_subtitle' => 'Hero Subtitle'],
     'About Section'       => ['about_title' => 'About Title', 'about_text' => 'About Text'],
     'Contact Info'        => ['contact_address' => 'Address', 'contact_phone' => 'Phone', 'contact_email' => 'Email', 'contact_hours' => 'Business Hours'],
-    'PDF Quotation — Terms &amp; Conditions' => ['quotation_tnc' => 'Terms &amp; Conditions (one item per line, no bullet needed)'],
 ];
-$textareaKeys = ['about_text', 'hero_subtitle', 'quotation_tnc'];
+$textareaKeys = ['about_text', 'hero_subtitle', 'quotation_tnc', 'tnc_basic', 'tnc_sublimation', 'tnc_signage'];
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" type="image/png" href="../assets/pw.png">
-  <title>Printworld</title>
+  <title>Printworld - Site Content</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../assets/css/style.css">
@@ -70,6 +69,32 @@ $textareaKeys = ['about_text', 'hero_subtitle', 'quotation_tnc'];
       <?php endforeach; ?>
     </div>
     <?php endforeach; ?>
+
+    <!-- Service-Based Terms & Conditions -->
+    <div class="admin-card" style="margin-bottom:24px">
+      <div class="admin-card-header"><h3><i class="fas fa-file-contract" style="margin-right:8px;color:#f5c842"></i>Terms &amp; Conditions — By Service Category</h3></div>
+      <p style="padding:0 0 16px;font-size:0.82rem;color:var(--gray-400)">Each category has its own T&amp;C. These are automatically included in the PDF based on which services the client requested. One item per line — each line becomes a bullet point.</p>
+
+      <?php
+      $tncSections = [
+          'tnc_basic'       => ['label' => 'Basic Services', 'icon' => 'fa-print', 'desc' => 'Mug, Keychain, Tarpaulin, Souvenirs, etc.'],
+          'tnc_sublimation' => ['label' => 'Sublimation Services', 'icon' => 'fa-shirt', 'desc' => 'T-Shirt, Polo Shirt, Jersey, etc.'],
+          'tnc_signage'     => ['label' => 'Signage Services', 'icon' => 'fa-sign-hanging', 'desc' => 'Acrylic, Stainless, Panaflex, Billboard, etc.'],
+      ];
+      foreach ($tncSections as $key => $meta):
+      ?>
+      <div class="form-group" style="border-top:1px solid var(--gray-200);padding-top:16px;margin-top:4px">
+        <label style="font-size:0.9rem;font-weight:700">
+          <i class="fas <?= $meta['icon'] ?>" style="margin-right:6px;color:#888"></i>
+          <?= $meta['label'] ?> Terms &amp; Conditions
+          <small style="font-weight:400;color:#aaa;margin-left:6px"><?= $meta['desc'] ?></small>
+        </label>
+        <textarea name="content[<?= $key ?>]" class="form-control" rows="8"><?= htmlspecialchars($content[$key] ?? '') ?></textarea>
+        <p style="font-size:0.75rem;color:#888;margin-top:4px"><i class="fas fa-info-circle"></i> Each line = one bullet point in the PDF.</p>
+      </div>
+      <?php endforeach; ?>
+    </div>
+
     <button type="submit" class="btn btn-dark"><i class="fas fa-save"></i> Save Content</button>
   </form>
 </main>

@@ -58,7 +58,7 @@ $images = $db->query("SELECT * FROM gallery ORDER BY sort_order ASC, created_at 
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" type="image/png" href="../assets/pw.png">
-  <title>Printworld</title>
+  <title>Printworld - Gallery</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../assets/css/style.css">

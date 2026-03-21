@@ -148,6 +148,9 @@ ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS category ENUM('basic','s
 ALTER TABLE service_categories ADD COLUMN IF NOT EXISTS image_path VARCHAR(255) DEFAULT NULL;
 ALTER TABLE quotation_requests ADD COLUMN IF NOT EXISTS location VARCHAR(255) AFTER signage_address;
 ALTER TABLE final_quotations ADD COLUMN IF NOT EXISTS location VARCHAR(255) DEFAULT NULL AFTER notes;
+ALTER TABLE premium_clients ADD COLUMN IF NOT EXISTS branch VARCHAR(200) DEFAULT NULL AFTER address;
+ALTER TABLE premium_clients ADD COLUMN IF NOT EXISTS dear VARCHAR(200) DEFAULT NULL AFTER branch;
+ALTER TABLE premium_clients ADD COLUMN IF NOT EXISTS terms_conditions TEXT DEFAULT NULL AFTER dear;
 
 INSERT IGNORE INTO service_categories (name, slug, description, icon, category, sort_order) VALUES
 -- Basic Services

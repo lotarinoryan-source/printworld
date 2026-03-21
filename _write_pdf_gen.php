@@ -1,4 +1,7 @@
 <?php
+// Writes the clean pdf_generator.php
+$content = <<<'PHPEOF'
+<?php
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -343,3 +346,10 @@ function buildRequestPDFHtml(array $req, array $items): string {
       <div class='footer-addr'><strong>Printworld &amp; Advertising Services</strong><br>Roxas Ext., Digos City<br>0910 772 8888 &nbsp;&nbsp;(082) 272 4561</div>
     </div></body></html>";
 }
+PHPEOF;
+
+file_put_contents(
+    __DIR__ . '/includes/pdf_generator.php',
+    $content
+);
+echo "Written OK\n";

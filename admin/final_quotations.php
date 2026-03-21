@@ -23,6 +23,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend'])) {
     }
 }
 
+// Handle PDF regeneration (pulls latest client T&C + details from DB)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['regen_pdf'])) {
+    require_once '../includes/pdf_generator.php';
+    $qid = (int)$_POST['quotation_id'];
+    $q   = $db->query("SELECT * FROM final_quotations WHERE id=$qid")->fetch_assoc();
+    if ($q) {
+        $items = $db->query("SELECT * FROM final_quotation_items WHERE quotation_id=$qid")->fetch_all(MYSQLI_ASSOC);
+        // Pull latest T&C from premium client if linked
+        if ($q['is_premium'] && $q['premium_client_id']) {
+            $pc = $db->query("SELECT * FROM premium_clients WHERE id=" . (int)$q['premium_client_id'])->fetch_assoc();
+            if ($pc) {
+                $q['terms_conditions'] = $pc['terms_conditions'] ?? '';
+                $q['company_name']     = $pc['company_name'];
+                $q['prem_address']     = $q['prem_address'] ?: $pc['address'];
+            }
+        }
+        // Pull latest branch data if linked
+        if (!empty($q['branch_id'])) {
+            $br = $db->query("SELECT * FROM client_branches WHERE id=" . (int)$q['branch_id'])->fetch_assoc();
+            if ($br) {
+                $q['prem_branch'] = $br['branch_name'];
+                if ($br['address']) $q['prem_address'] = $br['address'];
+                if ($br['dear'])    $q['prem_dear']    = $br['dear'];
+            }
+        }
+        $pdfPath = generateQuotationPDF($q, $items);
+        $upd = $db->prepare('UPDATE final_quotations SET pdf_path=? WHERE id=?');
+        $upd->bind_param('si', $pdfPath, $qid);
+        $upd->execute();
+        header('Location: final_quotations.php?view='.$qid.'&regen=1');
+        exit;
+    }
+}
+
 // Single quotation view
 if ($viewId) {
     $q = $db->query("SELECT * FROM final_quotations WHERE id=$viewId")->fetch_assoc();
@@ -34,7 +68,7 @@ if ($viewId) {
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" type="image/png" href="../assets/pw.png">
-  <title>Printworld</title>
+  <title>Printworld - Final Quotations</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../assets/css/style.css">
@@ -48,6 +82,14 @@ if ($viewId) {
     <?php if (!empty($q['pdf_path'])): ?>
     <a href="../download.php?file=<?= urlencode(basename($q['pdf_path'])) ?>" class="action-btn"><i class="fas fa-download"></i> Download PDF</a>
     <?php endif; ?>
+    <?php if ($q['is_premium'] && $q['premium_client_id']): ?>
+    <form method="POST" style="display:inline">
+      <input type="hidden" name="quotation_id" value="<?= $q['id'] ?>">
+      <button type="submit" name="regen_pdf" class="action-btn" style="background:#1a1a1a;color:#fff" onclick="return confirm('Regenerate PDF with latest client details?')">
+        <i class="fas fa-rotate"></i> Regenerate PDF
+      </button>
+    </form>
+    <?php endif; ?>
     <form method="POST" style="display:inline">
       <input type="hidden" name="quotation_id" value="<?= $q['id'] ?>">
       <button type="submit" name="resend" class="action-btn"><i class="fas fa-paper-plane"></i> Resend Email</button>
@@ -57,6 +99,7 @@ if ($viewId) {
 </div>
 <?php if ($sent === 1): ?><div class="alert alert-success">Email sent to client successfully.</div><?php endif; ?>
 <?php if ($sent === 0): ?><div class="alert alert-error">Email failed — check SMTP config.</div><?php endif; ?>
+<?php if (isset($_GET['regen'])): ?><div class="alert alert-success">PDF regenerated with latest client details.</div><?php endif; ?>
 <div style="display:grid;grid-template-columns:1fr 320px;gap:24px">
   <div>
     <div class="admin-card" style="margin-bottom:20px">
@@ -132,7 +175,7 @@ $quotations = $db->query("SELECT fq.*, qr.request_number FROM final_quotations f
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="icon" type="image/png" href="../assets/pw.png">
-  <title>Printworld</title>
+  <title>Printworld - Final Quotations</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="../assets/css/style.css">
