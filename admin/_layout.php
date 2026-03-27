@@ -13,6 +13,7 @@ function adminSidebar(string $active = ''): void {
         'gallery'           => ['icon' => 'fa-images',             'label' => 'Gallery'],
         'content'           => ['icon' => 'fa-pen-to-square',      'label' => 'Site Content'],
         'notes'             => ['icon' => 'fa-sticky-note',         'label' => 'Notes'],
+        'gcash'             => ['icon' => 'fa-mobile-screen-button', 'label' => 'GCash Transactions'],
     ];
 
     // Get pending count for initial render

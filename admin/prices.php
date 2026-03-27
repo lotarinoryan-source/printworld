@@ -72,15 +72,23 @@ $prices = getAllPrices();
 
   <div class="admin-card">
     <div class="admin-card-header"><h3>Service Prices</h3></div>
+    <div style="padding:0 0 16px">
+      <div style="position:relative;max-width:340px">
+        <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#aaa;font-size:.85rem"></i>
+        <input type="text" id="price-search" placeholder="Search item name..."
+          style="width:100%;padding:9px 14px 9px 36px;border:1px solid #ddd;border-radius:4px;font-size:.88rem;box-sizing:border-box"
+          oninput="filterPrices(this.value)">
+      </div>
+    </div>
     <form method="POST">
       <input type="hidden" name="action" value="update">
       <table class="data-table">
         <thead>
           <tr><th>Item Name</th><th>Unit</th><th>Price (₱)</th><th></th></tr>
         </thead>
-        <tbody>
+        <tbody id="prices-tbody">
           <?php foreach ($prices as $key => $p): ?>
-          <tr>
+          <tr data-name="<?= strtolower(htmlspecialchars($p['item_name'])) ?>">
             <td><strong><?= htmlspecialchars($p['item_name']) ?></strong></td>
             <td style="color:var(--gray-400);font-size:0.85rem"><?= htmlspecialchars($p['unit']) ?></td>
             <td style="width:200px">
@@ -142,6 +150,13 @@ $prices = getAllPrices();
 document.getElementById('add-modal').addEventListener('click', function(e) {
   if (e.target === this) this.style.display = 'none';
 });
+
+function filterPrices(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('#prices-tbody tr').forEach(function(tr) {
+    tr.style.display = tr.dataset.name.includes(q) ? '' : 'none';
+  });
+}
 </script>
 </body>
 </html>

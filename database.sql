@@ -126,6 +126,23 @@ CREATE TABLE IF NOT EXISTS final_quotation_items (
     FOREIGN KEY (quotation_id) REFERENCES final_quotations(id) ON DELETE CASCADE
 );
 
+-- Signage Type Options (per service_category slug)
+CREATE TABLE IF NOT EXISTS signage_type_options (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_slug VARCHAR(100) NOT NULL,
+    type_label VARCHAR(100) NOT NULL,
+    sort_order INT DEFAULT 0,
+    UNIQUE KEY uq_slug_label (service_slug, type_label)
+);
+
+-- Signage Light Options (per service_category slug)
+CREATE TABLE IF NOT EXISTS signage_light_options (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    service_slug VARCHAR(100) NOT NULL,
+    light_label VARCHAR(50) NOT NULL,
+    UNIQUE KEY uq_slug_light (service_slug, light_label)
+);
+
 -- Premium Clients
 CREATE TABLE IF NOT EXISTS premium_clients (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -152,6 +169,20 @@ ALTER TABLE premium_clients ADD COLUMN IF NOT EXISTS branch VARCHAR(200) DEFAULT
 ALTER TABLE premium_clients ADD COLUMN IF NOT EXISTS dear VARCHAR(200) DEFAULT NULL AFTER branch;
 ALTER TABLE premium_clients ADD COLUMN IF NOT EXISTS terms_conditions TEXT DEFAULT NULL AFTER dear;
 
+-- Client Branches (multiple branches per premium client)
+CREATE TABLE IF NOT EXISTS client_branches (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    client_id INT NOT NULL,
+    branch_name VARCHAR(200) NOT NULL,
+    address TEXT,
+    dear VARCHAR(200),
+    is_active TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES premium_clients(id) ON DELETE CASCADE
+);
+
+ALTER TABLE final_quotations ADD COLUMN IF NOT EXISTS branch_id INT DEFAULT NULL AFTER premium_client_id;
+
 INSERT IGNORE INTO service_categories (name, slug, description, icon, category, sort_order) VALUES
 -- Basic Services
 ('Keychain',     'keychain',    'Personalized keychains for any occasion',                   'fa-key',          'basic', 0),
@@ -173,22 +204,67 @@ INSERT IGNORE INTO service_categories (name, slug, description, icon, category, 
 ('Stainless',    'stainless',   'Durable stainless steel signage for a professional look',   'fa-sign-hanging', 'signage', 21),
 ('Panaflex',     'panaflex',    'Vibrant panaflex signage for storefronts and billboards',   'fa-sign-hanging', 'signage', 22),
 ('Billboard',    'billboard',   'Large-format billboard printing for maximum visibility',    'fa-sign-hanging', 'signage', 23);
+INSERT IGNORE INTO premium_clients (company_name, contact_person, email, phone, address) VALUES
+('Mr DIY', 'Store Manager', '', '', '3A floor Xeland Building Guerilla Street, Cor. Mayor Gil Fernando Ave. Marikina City, Philippines 1800'),
+('Sailun', 'Branch Manager', '', '', 'Digos City, Davao del Sur'),
+('Pet One', 'Store Manager', '', '', 'Digos City, Davao del Sur'),
+('Jollibee', 'Branch Manager', '', '', 'Digos City, Davao del Sur'),
+('SM Hypermarket', 'Store Manager', '', '', 'Digos City, Davao del Sur'),
+('Puregold', 'Branch Manager', '', '', 'Digos City, Davao del Sur'),
+('Robinsons', 'Store Manager', '', '', 'Digos City, Davao del Sur'),
+('Gaisano', 'Branch Manager', '', '', 'Digos City, Davao del Sur');
 
-INSERT IGNORE INTO prices (item_key, item_name, price, unit) VALUES
-('mug', 'Mug Printing', 150.00, 'per piece'),
-('keychain', 'Keychain', 80.00, 'per piece'),
-('keyholder', 'Keyholder', 90.00, 'per piece'),
-('ref_magnet', 'Ref Magnet', 70.00, 'per piece'),
-('tshirt', 'T-Shirt Sublimation', 250.00, 'per piece'),
-('polo_shirt', 'Polo Shirt Sublimation', 350.00, 'per piece'),
-('tarpaulin_sqft', 'Tarpaulin', 25.00, 'per sq ft'),
-('signage_sqft', 'Signage', 450.00, 'per sq ft');
+-- Default signage type options per service slug
+INSERT IGNORE INTO signage_type_options (service_slug, type_label, sort_order) VALUES
+('acrylic',   'Flat Type', 0),
+('acrylic',   'Build Up Type', 1),
+('acrylic',   'Build Up Type with Cladding', 2),
+('stainless', 'Flat Type', 0),
+('stainless', 'Build Up Type', 1),
+('stainless', 'Build Up Type with Cladding', 2),
+('panaflex',  'Single Face', 0),
+('panaflex',  'Double Face', 1),
+('panaflex',  'Single Frame', 2),
+('panaflex',  'Double Face Frame', 3),
+('panaflex',  'Special Design', 4),
+('billboard', 'Single Frame', 0),
+('billboard', 'Double Face Frame', 1);
 
-INSERT IGNORE INTO site_content (content_key, content_value) VALUES
-('hero_title', 'Printworld Advertising Services'),
-('hero_subtitle', 'Highest in Quality, Lowest in Prices.'),
-('about_title', 'About Printworld'),
-('about_text', 'Printworld is a professional printing shop dedicated to delivering high-quality printing services. With years of experience, we bring your ideas to life with precision and creativity. From tarpaulins to custom souvenirs, we handle it all.'),
+-- Default signage light options per service slug
+INSERT IGNORE INTO signage_light_options (service_slug, light_label) VALUES
+('acrylic',   'Lighted'),
+('acrylic',   'Non-lighted'),
+('stainless', 'Lighted'),
+('stainless', 'Non-lighted'),
+('panaflex',  'Lighted'),
+('panaflex',  'Non-lighted'),
+('billboard', 'Non-lighted');cur before or during delivery, installation or execution of materials.
+Signages for this project will be installed before the store opening.
+Printworld will tap to the nearest electricity supply up to 2 meters in excess to this provision will be charged to client.
+10% weekly interest will be charged as penalty for late payment.
+Any intentional scratches or damages on the product will void the warranty.
+(5) years of Avery Sticker warranty
+(6) months of LED warranty.
+(1) year of faulty workmanship.'),
+('tnc_basic', 'Full payment must be made within 30 calendar days from project completion.
+Printworld shall not be held liable for any acts of God that may occur before or during delivery, installation or execution of materials.
+10% weekly interest will be charged as penalty for late payment.
+Any intentional scratches or damages on the product will void the warranty.
+(5) years of Avery Sticker warranty.'),
+('tnc_sublimation', 'Full payment must be made within 30 calendar days from project completion.
+Printworld shall not be held liable for any acts of God that may occur before or during delivery, installation or execution of materials.
+10% weekly interest will be charged as penalty for late payment.
+Any intentional scratches or damages on the product will void the warranty.
+Sublimation colors may slightly vary due to fabric type and printing process.'),
+('tnc_signage', 'Full payment must be made within 30 calendar days from project completion.
+Printworld shall not be held liable for any acts of God that may occur before or during delivery, installation or execution of materials.
+Signages for this project will be installed before the store opening.
+Printworld will tap to the nearest electricity supply up to 2 meters in excess to this provision will be charged to client.
+10% weekly interest will be charged as penalty for late payment.
+Any intentional scratches or damages on the product will void the warranty.
+(5) years of Avery Sticker warranty.
+(6) months of LED warranty.
+(1) year of faulty workmanship.');ofessional printing shop dedicated to delivering high-quality printing services. With years of experience, we bring your ideas to life with precision and creativity. From tarpaulins to custom souvenirs, we handle it all.'),
 ('contact_address', 'Digos City, Davao del Sur, Philippines'),
 ('contact_phone', '09107728888'),
 ('contact_email', 'digosprinting@gmail.com'),
@@ -213,3 +289,35 @@ INSERT IGNORE INTO premium_clients (company_name, contact_person, email, phone, 
 ('Puregold', 'Branch Manager', '', '', 'Digos City, Davao del Sur'),
 ('Robinsons', 'Store Manager', '', '', 'Digos City, Davao del Sur'),
 ('Gaisano', 'Branch Manager', '', '', 'Digos City, Davao del Sur');
+
+-- Signage Color Sticker Codes
+CREATE TABLE IF NOT EXISTS `signage_color_codes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `signage_id` int(11) NOT NULL,
+  `color_code` varchar(50) NOT NULL,
+  `color_name` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_signage_id` (`signage_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Client Color Sticker Codes
+CREATE TABLE IF NOT EXISTS `client_color_codes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `client_name` varchar(150) NOT NULL,
+  `color_code` varchar(50) NOT NULL,
+  `color_name` varchar(100) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_client` (`client_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ===== CLIENT NOTES (Unpaid Tracking) =====
+CREATE TABLE IF NOT EXISTS `client_notes` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `client_name` VARCHAR(255) NOT NULL,
+  `description` TEXT NOT NULL,
+  `price` DECIMAL(10,2) NOT NULL DEFAULT 0,
+  `status` ENUM('Unpaid','Paid') NOT NULL DEFAULT 'Unpaid',
+  `date_added` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
