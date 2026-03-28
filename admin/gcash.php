@@ -25,12 +25,22 @@ $db->query("CREATE TABLE IF NOT EXISTS gcash_cash_out (
 
 $gcashUnlocked = !empty($_SESSION['gcash_unlocked']);
 
+// Load autolock setting
+$autolockRow = $db->query("SELECT `value` FROM site_settings WHERE `key`='gcash_autolock_enabled' LIMIT 1");
+$gcashAutolockEnabled = ($autolockRow && ($ar = $autolockRow->fetch_assoc())) ? $ar['value'] : '1';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gcash_pw'])) {
-    if ($_POST['gcash_pw'] === GCASH_PASSWORD) {
+    // Verify against the GCash page password (from DB or config)
+    $gcashLockPw = GCASH_PASSWORD;
+    $pwRow = $db->query("SELECT `value` FROM site_settings WHERE `key`='gcash_lock_password' LIMIT 1");
+    if ($pwRow && $r = $pwRow->fetch_assoc()) {
+        $gcashLockPw = $r['value'] ?: GCASH_PASSWORD;
+    }
+    if ($_POST['gcash_pw'] === $gcashLockPw) {
         $_SESSION['gcash_unlocked'] = true;
         $gcashUnlocked = true;
     } else {
-        $pwError = 'Incorrect password.';
+        $pwError = 'Incorrect password. Please try again.';
     }
 }
 if (isset($_GET['lock'])) {
@@ -71,11 +81,12 @@ function gcashChartData($db): array {
     $sql = "SELECT
         DATE(created_at) AS day,
         SUM(amount) AS total_amount,
+        SUM(charge) AS total_charge,
         COUNT(*)    AS tx_count
     FROM (
-        SELECT amount, created_at FROM gcash_cash_in
+        SELECT amount, charge, created_at FROM gcash_cash_in
         UNION ALL
-        SELECT amount, created_at FROM gcash_cash_out
+        SELECT amount, charge, created_at FROM gcash_cash_out
     ) AS combined
     WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 29 DAY)
     GROUP BY DATE(created_at)
@@ -156,10 +167,22 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
   <div class="admin-topbar">
     <h1><i class="fas fa-mobile-screen-button" style="margin-right:8px;color:#16a34a"></i>GCash Transactions</h1>
     <?php if ($gcashUnlocked): ?>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="btn btn-dark" onclick="window.print()"><i class="fas fa-print"></i> Print</button>
       <button class="action-btn" onclick="exportPDF()"><i class="fas fa-file-pdf"></i> Export PDF</button>
+      <button class="action-btn" onclick="switchGcTab('gcnotes', document.querySelector('.gc-tab:last-child'))"><i class="fas fa-note-sticky" style="color:#d97706"></i> Notes</button>
       <a href="gcash.php?lock=1" class="action-btn"><i class="fas fa-lock"></i> Lock</a>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.8rem;color:#555;margin-left:4px" title="Auto-lock on page exit">
+        <span style="white-space:nowrap"><i class="fas fa-shield-halved" style="color:#7c3aed;margin-right:3px"></i>Auto-Lock</span>
+        <span style="position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0">
+          <input type="checkbox" id="autolock-toggle" <?= $gcashAutolockEnabled === '1' ? 'checked' : '' ?>
+            onchange="saveAutolock(this.checked)"
+            style="opacity:0;width:0;height:0;position:absolute">
+          <span id="autolock-slider" style="position:absolute;inset:0;background:<?= $gcashAutolockEnabled === '1' ? '#7c3aed' : '#ccc' ?>;border-radius:22px;transition:.3s;cursor:pointer">
+            <span style="position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:3px;transition:.3s;left:<?= $gcashAutolockEnabled === '1' ? '21px' : '3px' ?>"></span>
+          </span>
+        </span>
+      </label>
     </div>
     <?php endif; ?>
   </div>
@@ -169,7 +192,7 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
   <div class="gc-lock-card">
     <div class="gc-lock-icon"><i class="fas fa-lock"></i></div>
     <h2 style="margin-bottom:6px;font-size:1.2rem">GCash Access</h2>
-    <p style="color:#888;font-size:.88rem;margin-bottom:24px">Enter the GCash page password to continue.</p>
+    <p style="color:#888;font-size:.88rem;margin-bottom:24px">Enter the GCash password to continue.</p>
     <?php if (!empty($pwError)): ?>
     <div class="alert alert-error" style="margin-bottom:16px"><?= htmlspecialchars($pwError) ?></div>
     <?php endif; ?>
@@ -181,6 +204,9 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
       <button type="submit" class="btn btn-dark" style="width:100%;justify-content:center;margin-top:8px">
         <i class="fas fa-unlock"></i> Unlock
       </button>
+      <a href="dashboard.php" style="display:block;text-align:center;margin-top:12px;font-size:.82rem;color:#aaa;text-decoration:none">
+        <i class="fas fa-arrow-left" style="margin-right:4px"></i> Back to Dashboard
+      </a>
     </form>
   </div>
 </div>
@@ -198,6 +224,8 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
       if ($dr['tx_count'] > $busiestCount) { $busiestCount = $dr['tx_count']; $busiestDay = $dr['day']; }
   }
 ?>
+
+<!-- GRAPH — shown when Graph tab is active -->
 
 <!-- OVERALL SUMMARY -->
 <div class="gc-overall">
@@ -224,7 +252,7 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
   <div class="gc-tab active"  onclick="switchGcTab('in',this)"><i class="fas fa-arrow-down" style="color:#16a34a;margin-right:5px"></i>Cash In</div>
   <div class="gc-tab" onclick="switchGcTab('out',this)"><i class="fas fa-arrow-up" style="color:#dc2626;margin-right:5px"></i>Cash Out</div>
   <div class="gc-tab" onclick="switchGcTab('daily',this)"><i class="fas fa-calendar-days" style="color:#2563eb;margin-right:5px"></i>Daily Summary</div>
-  <div class="gc-tab" onclick="switchGcTab('graph',this)"><i class="fas fa-chart-bar" style="color:#7c3aed;margin-right:5px"></i>Graph</div>
+  <div class="gc-tab" onclick="switchGcTab('graph',this)"><i class="fas fa-chart-line" style="color:#7c3aed;margin-right:5px"></i>Graph</div>
 </div>
 
 <!-- CASH IN PANE -->
@@ -341,7 +369,7 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
             $isBusiest = $dr['day'] === $busiestDay;
           ?>
           <tr <?= $isBusiest ? 'class="day-best"' : '' ?>>
-            <td style="font-weight:600;white-space:nowrap">
+            <td style="font-weight:600;white-space:nowrap;cursor:pointer;color:#2563eb;text-decoration:underline" onclick="openDayDetail('<?= $dr['day'] ?>')">
               <?= date('M d, Y', strtotime($dr['day'])) ?>
               <?php if ($isBusiest): ?><span style="font-size:.7rem;background:#f5c842;color:#000;border-radius:3px;padding:1px 6px;margin-left:6px">🔥 Busiest</span><?php endif; ?>
             </td>
@@ -363,10 +391,10 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
   <div class="chart-wrap">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
       <h3 style="font-size:.9rem;letter-spacing:1px;text-transform:uppercase;margin:0">
-        <i class="fas fa-chart-bar" style="color:#7c3aed;margin-right:6px"></i>Daily Transactions — Last 30 Days
+        <i class="fas fa-chart-line" style="color:#7c3aed;margin-right:6px"></i>Daily Transactions — Last 30 Days
       </h3>
       <div style="display:flex;gap:8px">
-        <button class="action-btn gc-chart-toggle active" data-mode="amount" onclick="toggleChart('amount',this)">By Amount</button>
+        <button class="action-btn gc-chart-toggle active" data-mode="profit" onclick="toggleChart('profit',this)">By Profit</button>
         <button class="action-btn gc-chart-toggle" data-mode="count" onclick="toggleChart('count',this)">By Count</button>
       </div>
     </div>
@@ -376,23 +404,80 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
       <span><span class="dot" style="background:#dc2626"></span>Cash Out</span>
     </div>
   </div>
-
   <?php if (!empty($busiestDay)): ?>
-  <div class="admin-card" style="padding:20px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-    <div style="width:48px;height:48px;background:#fef9c3;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-      <i class="fas fa-trophy" style="color:#f59e0b;font-size:1.3rem"></i>
+  <div class="admin-card" style="padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:16px">
+    <div style="width:40px;height:40px;background:#fef9c3;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+      <i class="fas fa-trophy" style="color:#f59e0b;font-size:1.1rem"></i>
     </div>
     <div>
-      <div style="font-size:.72rem;color:#888;text-transform:uppercase;letter-spacing:1px">Busiest Day</div>
-      <div style="font-size:1.1rem;font-weight:800"><?= date('F d, Y', strtotime($busiestDay)) ?></div>
-      <div style="font-size:.85rem;color:#666"><?= $busiestCount ?> transaction(s) recorded</div>
+      <div style="font-size:.7rem;color:#888;text-transform:uppercase;letter-spacing:1px">Busiest Day</div>
+      <div style="font-size:1rem;font-weight:800"><?= date('F d, Y', strtotime($busiestDay)) ?></div>
+      <div style="font-size:.82rem;color:#666"><?= $busiestCount ?> transaction(s) recorded</div>
     </div>
   </div>
   <?php endif; ?>
 </div>
 
+<?php
+// Create gcash_notes table
+$db->query("CREATE TABLE IF NOT EXISTS gcash_notes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    note TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)");
+$gcashNotes = $db->query("SELECT * FROM gcash_notes ORDER BY created_at DESC LIMIT 100")->fetch_all(MYSQLI_ASSOC);
+?>
+
+<!-- NOTES PANE -->
+<div class="gc-pane" id="pane-gcnotes">
+  <div class="gc-add-form" style="align-items:flex-start;flex-direction:column;gap:12px">
+    <label style="font-weight:700;font-size:.85rem;text-transform:uppercase;letter-spacing:1px"><i class="fas fa-note-sticky" style="color:#d97706;margin-right:6px"></i>Add a Note</label>
+    <textarea id="gcnote-input" class="form-control" rows="3" placeholder="Write a note or remark for today's transactions..." style="width:100%;resize:vertical"></textarea>
+    <button class="btn btn-dark" onclick="saveGcNote()"><i class="fas fa-plus"></i> Add Note</button>
+  </div>
+  <div class="admin-card" style="padding:0">
+    <div class="admin-card-header" style="padding:16px 20px">
+      <h3><i class="fas fa-note-sticky" style="color:#d97706;margin-right:6px"></i>Notes</h3>
+    </div>
+    <div id="gcnotes-list" style="padding:0 20px 20px">
+      <?php if (empty($gcashNotes)): ?>
+      <p id="gcnotes-empty" style="color:#aaa;text-align:center;padding:32px 0;font-size:.9rem">No notes yet. Add one above.</p>
+      <?php else: ?>
+      <?php foreach ($gcashNotes as $n): ?>
+      <div class="gcnote-item" id="gcnote-<?= $n['id'] ?>" style="border-bottom:1px solid #f0f0f0;padding:14px 0;display:flex;gap:12px;align-items:flex-start">
+        <div style="width:36px;height:36px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <i class="fas fa-note-sticky" style="color:#d97706;font-size:.85rem"></i>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:.9rem;line-height:1.6;white-space:pre-wrap"><?= htmlspecialchars($n['note']) ?></div>
+          <div style="font-size:.75rem;color:#aaa;margin-top:4px"><?= date('M d, Y h:i A', strtotime($n['created_at'])) ?></div>
+        </div>
+        <button class="action-btn danger" onclick="deleteGcNote(<?= $n['id'] ?>)" style="flex-shrink:0"><i class="fas fa-trash"></i></button>
+      </div>
+      <?php endforeach; ?>
+      <?php endif; ?>
+    </div>
+  </div>
+</div>
+
 <?php endif; ?>
 </main>
+
+<!-- Day Drill-Down Modal -->
+<div id="day-modal" class="pw-overlay">
+  <div style="background:#fff;width:100%;max-width:720px;border-radius:8px;max-height:90vh;display:flex;flex-direction:column">
+    <div style="padding:20px 24px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <h3 id="day-modal-title" style="margin:0;font-size:1rem"><i class="fas fa-calendar-day" style="color:#2563eb;margin-right:8px"></i>Day Detail</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="day-pdf-btn" class="action-btn" onclick="exportDayPDF()"><i class="fas fa-file-pdf"></i> Export PDF</button>
+        <button onclick="document.getElementById('day-modal').classList.remove('open')" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:#aaa;line-height:1">&times;</button>
+      </div>
+    </div>
+    <div id="day-modal-body" style="overflow-y:auto;padding:20px 24px;flex:1">
+      <div style="text-align:center;padding:32px;color:#aaa"><i class="fas fa-spinner fa-spin"></i> Loading...</div>
+    </div>
+  </div>
+</div>
 
 <!-- Delete Modal -->
 <div id="del-modal" class="pw-overlay">
@@ -446,7 +531,7 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
     document.querySelectorAll('.gc-pane').forEach(function (p) { p.classList.remove('active'); });
     btn.classList.add('active');
     document.getElementById('pane-' + type).classList.add('active');
-    if (type === 'graph' && !window._chartBuilt) buildChart('amount');
+    if (type === 'graph' && !window._chartBuilt) buildChart('profit');
   };
 
   // ── Toast ──────────────────────────────────────────────────────────────
@@ -571,7 +656,7 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
   function buildChart(mode) {
     var labels = chartRaw.map(function (r) { return r.day; });
     var data   = chartRaw.map(function (r) {
-      return mode === 'amount' ? parseFloat(r.total_amount) : parseInt(r.tx_count);
+      return mode === 'profit' ? parseFloat(r.total_charge) : parseInt(r.tx_count);
     });
     var maxVal = Math.max.apply(null, data);
     var colors = data.map(function (v) {
@@ -584,7 +669,7 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
       data: {
         labels: labels,
         datasets: [{
-          label: mode === 'amount' ? 'Total Amount (₱)' : 'Transactions',
+          label: mode === 'profit' ? 'Daily Profit (₱)' : 'Transactions',
           data: data,
           borderColor: '#16a34a',
           backgroundColor: 'rgba(22,163,74,0.08)',
@@ -604,7 +689,7 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
           tooltip: {
             callbacks: {
               label: function (ctx) {
-                return mode === 'amount'
+                return mode === 'profit'
                   ? '₱' + parseFloat(ctx.raw).toLocaleString('en-PH', { minimumFractionDigits: 2 })
                   : ctx.raw + ' transaction(s)';
               }
@@ -743,6 +828,195 @@ $chartData  = $gcashUnlocked ? gcashChartData($db)     : [];
     var w = window.open('', '_blank');
     w.document.write(html);
     w.document.close();
+  };
+
+  // ── Day drill-down ─────────────────────────────────────────────────────
+  var _dayData = null;
+  var _dayDate = '';
+
+  window.openDayDetail = function (date) {
+    _dayDate = date;
+    var modal = document.getElementById('day-modal');
+    var body  = document.getElementById('day-modal-body');
+    document.getElementById('day-modal-title').innerHTML =
+      '<i class="fas fa-calendar-day" style="color:#2563eb;margin-right:8px"></i>' +
+      'Transactions for ' + new Date(date + 'T00:00:00').toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
+    body.innerHTML = '<div style="text-align:center;padding:32px;color:#aaa"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+    modal.classList.add('open');
+
+    var fd = new FormData();
+    fd.append('action', 'day_detail');
+    fd.append('date', date);
+    fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res.ok) { body.innerHTML = '<p style="color:#c00;padding:20px">' + (res.msg || 'Error loading.') + '</p>'; return; }
+        _dayData = res;
+        body.innerHTML = buildDayHtmlBody(res, false);
+      })
+      .catch(function () { body.innerHTML = '<p style="color:#c00;padding:20px">Network error.</p>'; });
+  };
+
+  document.getElementById('day-modal').addEventListener('click', function (e) {
+    if (e.target === this) this.classList.remove('open');
+  });
+
+  function buildDayHtmlBody(res, forPdf) {
+    var inRows  = res.cash_in  || [];
+    var outRows = res.cash_out || [];
+    var s       = res.summary  || {};
+
+    function calcSub(rows) {
+      var amt = 0, chg = 0, tot = 0;
+      rows.forEach(function (r) { amt += parseFloat(r.amount)||0; chg += parseFloat(r.charge)||0; tot += parseFloat(r.total)||0; });
+      return { amt: amt, chg: chg, tot: tot };
+    }
+
+    function tblRows(rows, type) {
+      if (!rows.length) return '<tr><td colspan="5" style="text-align:center;color:#aaa;padding:16px">No ' + type + ' transactions.</td></tr>';
+      var sub = calcSub(rows);
+      var html = rows.map(function (r, i) {
+        return '<tr>'
+          + '<td>' + (i+1) + '</td>'
+          + '<td style="white-space:nowrap">' + r.time + '</td>'
+          + '<td>₱' + fmt(r.amount) + '</td>'
+          + '<td style="color:#16a34a;font-weight:600">₱' + fmt(r.charge) + '</td>'
+          + '<td style="font-weight:700">₱' + fmt(r.total) + '</td>'
+          + '</tr>';
+      }).join('');
+      // subtotal row
+      html += '<tr style="background:#f0fdf4;border-top:2px solid #16a34a">'
+        + '<td colspan="2" style="font-weight:700;font-size:.8rem;text-transform:uppercase;letter-spacing:1px;padding:8px 12px;color:#166534">Subtotal</td>'
+        + '<td style="font-weight:800;color:#111">₱' + fmt(sub.amt) + '</td>'
+        + '<td style="font-weight:800;color:#16a34a">₱' + fmt(sub.chg) + '</td>'
+        + '<td style="font-weight:800;color:#111">₱' + fmt(sub.tot) + '</td>'
+        + '</tr>';
+      return html;
+    }
+
+    var tblStyle = 'width:100%;border-collapse:collapse;margin-bottom:20px;font-size:.88rem';
+    var thStyle  = 'background:#111;color:#fff;padding:8px 12px;text-align:left;font-size:.75rem';
+
+    return '<h4 style="margin:0 0 10px;font-size:.82rem;text-transform:uppercase;letter-spacing:1px;color:#16a34a"><i class="fas fa-arrow-down" style="margin-right:6px"></i>Cash In</h4>'
+      + '<table style="' + tblStyle + '"><thead><tr>'
+      + '<th style="' + thStyle + '">#</th><th style="' + thStyle + '">Time</th><th style="' + thStyle + '">Amount</th><th style="' + thStyle + '">Charge</th><th style="' + thStyle + '">Total</th>'
+      + '</tr></thead><tbody>' + tblRows(inRows, 'Cash In') + '</tbody></table>'
+      + '<h4 style="margin:0 0 10px;font-size:.82rem;text-transform:uppercase;letter-spacing:1px;color:#dc2626"><i class="fas fa-arrow-up" style="margin-right:6px"></i>Cash Out</h4>'
+      + '<table style="' + tblStyle + '"><thead><tr>'
+      + '<th style="' + thStyle + '">#</th><th style="' + thStyle + '">Time</th><th style="' + thStyle + '">Amount</th><th style="' + thStyle + '">Charge</th><th style="' + thStyle + '">Total</th>'
+      + '</tr></thead><tbody>' + tblRows(outRows, 'Cash Out') + '</tbody></table>'
+      + '<table style="' + tblStyle + 'border-top:2px solid #111;margin-top:8px">'
+      + '<tr style="background:#111"><td colspan="2" style="padding:8px 12px;color:#fff;font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:1px">Overall Total</td>'
+      + '<td style="padding:8px 12px;color:#fff;font-weight:800">₱' + fmt(s.total_amount || 0) + '</td>'
+      + '<td style="padding:8px 12px;color:#f5c842;font-weight:800">₱' + fmt(s.total_charge || 0) + '</td>'
+      + '<td style="padding:8px 12px;color:#fff;font-weight:800">₱' + fmt(s.total_total || 0) + '</td>'
+      + '</tr></table>';
+  }
+
+  window.exportDayPDF = function () {
+    if (!_dayData || !_dayDate) return;
+    var printDate = new Date().toLocaleString('en-PH', { dateStyle: 'long', timeStyle: 'short' });
+    var reportDate = new Date(_dayDate + 'T00:00:00').toLocaleDateString('en-PH', { year:'numeric', month:'long', day:'numeric' });
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>GCash Daily Report — ' + reportDate + '</title>'
+      + '<style>body{font-family:Arial,sans-serif;padding:32px;color:#111}'
+      + 'h1{font-size:18px;margin-bottom:2px}p.sub{color:#888;font-size:11px;margin-bottom:20px}'
+      + 'h4{font-size:12px;text-transform:uppercase;letter-spacing:1px;margin:16px 0 6px}'
+      + 'table{width:100%;border-collapse:collapse;margin-bottom:16px}'
+      + 'th{background:#111;color:#fff;padding:7px 10px;font-size:10px;text-align:left}'
+      + 'td{padding:6px 10px;border-bottom:1px solid #eee;font-size:11px}'
+      + 'tr:nth-child(even) td{background:#f9f9f9}'
+      + '.sum td:first-child{color:#888;font-size:10px;text-transform:uppercase;letter-spacing:1px}'
+      + '.sum td:last-child{font-weight:700;font-size:13px}'
+      + '</style></head><body>'
+      + '<h1>Printworld — GCash Daily Report</h1>'
+      + '<p class="sub">Report Date: ' + reportDate + ' &nbsp;|&nbsp; Print Date: ' + printDate + '</p>'
+      + buildDayHtmlBody(_dayData, true)
+      + '<script>window.onload=function(){window.print();}<\/script>'
+      + '</body></html>';
+    var w = window.open('', '_blank');
+    w.document.write(html);
+    w.document.close();
+  };
+
+  // ── Midnight auto-refresh ──────────────────────────────────────────────
+  (function scheduleMidnightRefresh() {
+    var now  = new Date();
+    var next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5); // 12:00:05 AM next day
+    var ms   = next - now;
+    setTimeout(function () {
+      location.reload();
+    }, ms);
+  })();
+
+
+
+  // ── GCash Notes ────────────────────────────────────────────────────────
+  window.saveGcNote = function () {
+    var txt = document.getElementById('gcnote-input').value.trim();
+    if (!txt) { toast('Please write a note first.', 'error'); return; }
+    var fd = new FormData();
+    fd.append('action', 'add_note');
+    fd.append('note', txt);
+    fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (!res.ok) { toast(res.msg || 'Error.', 'error'); return; }
+        document.getElementById('gcnote-input').value = '';
+        var empty = document.getElementById('gcnotes-empty');
+        if (empty) empty.remove();
+        var list = document.getElementById('gcnotes-list');
+        var div  = document.createElement('div');
+        div.className = 'gcnote-item';
+        div.id = 'gcnote-' + res.id;
+        div.style.cssText = 'border-bottom:1px solid #f0f0f0;padding:14px 0;display:flex;gap:12px;align-items:flex-start';
+        div.innerHTML =
+          '<div style="width:36px;height:36px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+          + '<i class="fas fa-note-sticky" style="color:#d97706;font-size:.85rem"></i></div>'
+          + '<div style="flex:1"><div style="font-size:.9rem;line-height:1.6;white-space:pre-wrap">' + escHtml(txt) + '</div>'
+          + '<div style="font-size:.75rem;color:#aaa;margin-top:4px">' + res.created_at + '</div></div>'
+          + '<button class="action-btn danger" onclick="deleteGcNote(' + res.id + ')" style="flex-shrink:0"><i class="fas fa-trash"></i></button>';
+        list.insertBefore(div, list.firstChild);
+        toast('Note added.');
+      })
+      .catch(function () { toast('Network error.', 'error'); });
+  };
+
+  window.deleteGcNote = function (id) {
+    if (!confirm('Delete this note permanently?')) return;
+    var fd = new FormData();
+    fd.append('action', 'delete_note');
+    fd.append('id', id);
+    fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        if (res.ok) {
+          var el = document.getElementById('gcnote-' + id);
+          if (el) { el.style.opacity='0'; el.style.transition='opacity .3s'; setTimeout(function(){el.remove();},320); }
+          toast('Note deleted.');
+        } else { toast(res.msg || 'Error.', 'error'); }
+      })
+      .catch(function () { toast('Network error.', 'error'); });
+  };
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Auto-lock toggle ───────────────────────────────────────────────────
+  window.saveAutolock = function (enabled) {
+    var slider = document.getElementById('autolock-slider');
+    var dot    = slider ? slider.querySelector('span') : null;
+    if (slider) slider.style.background = enabled ? '#7c3aed' : '#ccc';
+    if (dot)    dot.style.left          = enabled ? '21px'   : '3px';
+    var fd = new FormData();
+    fd.append('action', 'toggle_autolock');
+    fd.append('enabled', enabled ? '1' : '0');
+    fetch(AJAX, { method: 'POST', body: fd, credentials: 'same-origin' })
+      .then(function (r) { return r.json(); })
+      .then(function (res) {
+        toast(enabled ? 'Auto-Lock enabled.' : 'Auto-Lock disabled.');
+      })
+      .catch(function () { toast('Failed to save setting.', 'error'); });
   };
 
 })();

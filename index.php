@@ -49,6 +49,7 @@ $services     = getActiveServices();
 <section class="hero" id="home">
   <div class="hero-bg"></div>
   <div class="hero-pattern"></div>
+  <canvas id="hero-canvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0"></canvas>
   <div class="hero-content">
     <div class="hero-badge">No. 1 High Quality Signages in Davao del Sur</div>
     <h1><?= htmlspecialchars($heroTitle) ?></h1>
@@ -145,14 +146,24 @@ $services     = getActiveServices();
     <div class="about-grid">
       <div class="about-text">
         <h2><?= htmlspecialchars($aboutTitle) ?></h2>
-        <p><?= nl2br(htmlspecialchars($aboutText)) ?></p>
-        <a href="quotation.php" class="btn btn-primary" style="margin-top:24px">Get a Quote</a>
-        <div class="about-stats">
-          <div class="stat-item"><div class="num">500+</div><div class="label">Happy Clients</div></div>
-          <div class="stat-item"><div class="num">5+</div><div class="label">Years Experience</div></div>
-          <div class="stat-item"><div class="num">1000+</div><div class="label">Projects Done</div></div>
-          <div class="stat-item"><div class="num">9</div><div class="label">Services Offered</div></div>
-        </div>
+
+        <p style="color:var(--gray-400);font-size:1rem;line-height:1.9;margin-bottom:16px">
+          It all started on <strong style="color:#fff">June 1, 2021</strong> with a small space, a big dream, and one simple belief: <em style="color:var(--gray-400)">every business deserves to be seen.</em>
+        </p>
+        <p style="color:var(--gray-400);font-size:1rem;line-height:1.9;margin-bottom:16px">
+          Printworld didn't begin as a big company. It started as a passion a desire to help local businesses, events, and individuals stand out through quality printing and signage. From the very first tarpaulin we printed to the first neon sign we lit up, every output carried the same commitment: <strong style="color:#fff">high quality, honest pricing.</strong>
+        </p>
+        <p style="color:var(--gray-400);font-size:1rem;line-height:1.9;margin-bottom:16px">
+          Word spread fast. Clients came back not just once, but again and again. They brought their friends, their businesses, their events. And with every project, Printworld grew a little more. New services were added. New equipment was acquired. New skills were mastered.
+        </p>
+        <p style="color:var(--gray-400);font-size:1rem;line-height:1.9;margin-bottom:16px">
+          Today, Printworld is one of the most trusted printing and signage shops in <strong style="color:#fff">Region XI, Davao Region</strong> offering everything from custom tarpaulins and sublimation products to full-scale signage, precision-cut acrylic signages, and bold panaflex displays.
+        </p>
+        <p style="color:var(--gray-400);font-size:1rem;line-height:1.9;margin-bottom:24px">
+          We're not just a printing shop. We're your partner in making your brand visible, your events memorable, and your ideas real. <strong style="color:#fff">This is Printworld and we're just getting started.</strong>
+        </p>
+
+        <a href="quotation.php" class="btn btn-primary">Get a Quote</a>
       </div>
       <div class="about-image">
         <img src="https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&q=80" alt="Printworld Shop">
@@ -260,6 +271,153 @@ $services     = getActiveServices();
 </div>
 
 <script src="assets/js/main.js"></script>
+<script>
+(function () {
+  var canvas = document.getElementById('hero-canvas');
+  if (!canvas) return;
+  var ctx = canvas.getContext('2d');
+
+  var NUM   = 3;
+  var SPEED = 1.2;
+  var TRAIL = 120;   // number of points in trail
+  var TURN  = 0.04;  // max radians per frame (smoothness of curve)
+  var worms = [];
+
+  function resize() {
+    canvas.width  = canvas.offsetWidth  || window.innerWidth;
+    canvas.height = canvas.offsetHeight || window.innerHeight;
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  var PALETTES = [
+    { head: '0,255,255',    trail: '0,180,255'   },
+    { head: '80,200,255',   trail: '40,120,255'  },
+    { head: '200,240,255',  trail: '120,200,255' },
+    { head: '0,255,180',    trail: '0,200,140'   },
+    { head: '255,255,255',  trail: '160,220,255' },
+  ];
+
+  function makeWorm(i) {
+    var angle = Math.random() * Math.PI * 2;
+    return {
+      x:          Math.random() * canvas.width,
+      y:          Math.random() * canvas.height,
+      angle:      angle,
+      targetAngle:angle,
+      changeTimer:0,
+      pal:        PALETTES[i % PALETTES.length],
+      pts:        [],
+    };
+  }
+
+  for (var i = 0; i < NUM; i++) worms.push(makeWorm(i));
+
+  function drawGrid() {
+    var CELL = 40;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+    ctx.lineWidth = 0.5;
+    for (var x = 0; x <= canvas.width;  x += CELL) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+    }
+    for (var y = 0; y <= canvas.height; y += CELL) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function updateWorm(w) {
+    // Pick a new target angle periodically
+    w.changeTimer--;
+    if (w.changeTimer <= 0) {
+      // Bias toward current direction ± 90° for snake-like curves
+      var bias = w.angle + (Math.random() - 0.5) * Math.PI * 1.2;
+      w.targetAngle  = bias;
+      w.changeTimer  = 40 + Math.floor(Math.random() * 80);
+    }
+
+    // Smoothly steer toward target angle
+    var diff = w.targetAngle - w.angle;
+    // Normalize to -PI..PI
+    while (diff >  Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    w.angle += Math.max(-TURN, Math.min(TURN, diff));
+
+    // Move
+    w.x += Math.cos(w.angle) * SPEED;
+    w.y += Math.sin(w.angle) * SPEED;
+
+    // Wrap around edges
+    if (w.x < -20)              w.x = canvas.width  + 20;
+    if (w.x > canvas.width + 20) w.x = -20;
+    if (w.y < -20)              w.y = canvas.height + 20;
+    if (w.y > canvas.height + 20) w.y = -20;
+
+    // Record position
+    w.pts.push({ x: w.x, y: w.y });
+    if (w.pts.length > TRAIL) w.pts.shift();
+  }
+
+  function drawWorm(w) {
+    var pts = w.pts;
+    if (pts.length < 3) return;
+
+    // Draw smooth curve through points using quadratic bezier
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+
+    for (var i = 1; i < pts.length - 1; i++) {
+      var prog  = i / pts.length;
+      var alpha = prog * prog * 0.9;
+      var width = 0.5 + prog * 1.8;
+
+      var mx = (pts[i].x + pts[i + 1].x) / 2;
+      var my = (pts[i].y + pts[i + 1].y) / 2;
+
+      // Each segment gets its own style for the fade effect
+      ctx.beginPath();
+      ctx.moveTo(
+        (pts[i - 1].x + pts[i].x) / 2,
+        (pts[i - 1].y + pts[i].y) / 2
+      );
+      ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+      ctx.strokeStyle = 'rgba(' + w.pal.trail + ',' + alpha + ')';
+      ctx.lineWidth   = width;
+      ctx.lineCap     = 'round';
+      ctx.lineJoin    = 'round';
+      ctx.stroke();
+    }
+
+    // Glowing head
+    var head = pts[pts.length - 1];
+    var grd  = ctx.createRadialGradient(head.x, head.y, 0, head.x, head.y, 6);
+    grd.addColorStop(0,   'rgba(' + w.pal.head + ',1)');
+    grd.addColorStop(0.5, 'rgba(' + w.pal.head + ',0.4)');
+    grd.addColorStop(1,   'rgba(' + w.pal.head + ',0)');
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = grd;
+    ctx.fill();
+
+    // Solid core
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(' + w.pal.head + ',1)';
+    ctx.fill();
+  }
+
+  function frame() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawGrid();
+    worms.forEach(function (w) { updateWorm(w); drawWorm(w); });
+    requestAnimationFrame(frame);
+  }
+
+  frame();
+})();
+</script>
+>
 <script>
 var adminModal = document.getElementById('admin-login-modal');
 

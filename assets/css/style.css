@@ -518,3 +518,78 @@ table.data-table tr:hover td { background:var(--gray-100); }
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ===== CLICK RIPPLE & HOVER ANIMATIONS (Landing Page) ===== */
+
+/* Ripple container */
+.ripple-host { position: relative; overflow: hidden; }
+
+/* Ripple wave */
+.ripple-wave {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  animation: ripple-expand 0.55s linear;
+  pointer-events: none;
+  background: rgba(255,255,255,0.25);
+}
+@keyframes ripple-expand {
+  to { transform: scale(4); opacity: 0; }
+}
+
+/* Button press scale */
+.btn:active { transform: scale(0.96) !important; }
+
+/* Nav link underline slide */
+.nav-links a {
+  position: relative;
+}
+.nav-links a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px; left: 0;
+  width: 0; height: 1px;
+  background: var(--white);
+  transition: width 0.25s ease;
+}
+.nav-links a:hover::after { width: 100%; }
+
+/* Service card hover glow */
+.service-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.service-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.13);
+}
+
+/* Service group card hover */
+.service-group-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Gallery item zoom */
+.gallery-item {
+  transition: transform 0.25s ease;
+}
+.gallery-item:hover { transform: scale(1.02); }
+
+/* Contact item icon bounce on hover */
+.contact-item:hover .contact-item-icon {
+  animation: icon-bounce 0.4s ease;
+}
+@keyframes icon-bounce {
+  0%,100% { transform: translateY(0); }
+  40%      { transform: translateY(-5px); }
+  70%      { transform: translateY(-2px); }
+}
+
+/* Footer social icon spin */
+.footer-social a:hover i {
+  animation: icon-spin 0.4s ease;
+}
+@keyframes icon-spin {
+  0%   { transform: rotate(0deg) scale(1); }
+  50%  { transform: rotate(15deg) scale(1.2); }
+  100% { transform: rotate(0deg) scale(1); }
+}

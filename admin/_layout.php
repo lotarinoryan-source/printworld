@@ -1,5 +1,15 @@
 <?php
 function adminSidebar(string $active = ''): void {
+    $db = db();
+
+    // Auto-lock GCash when navigating away — only if enabled in settings
+    if ($active !== 'gcash') {
+        $r        = $db->query("SELECT `value` FROM site_settings WHERE `key`='gcash_autolock_enabled' LIMIT 1");
+        $autolock = ($r && ($row = $r->fetch_assoc())) ? $row['value'] : '1';
+        if ($autolock === '1') {
+            unset($_SESSION['gcash_unlocked']);
+        }
+    }
     $siteName = SITE_NAME;
     $nav = [
         'dashboard'         => ['icon' => 'fa-gauge',              'label' => 'Dashboard'],
@@ -14,10 +24,10 @@ function adminSidebar(string $active = ''): void {
         'content'           => ['icon' => 'fa-pen-to-square',      'label' => 'Site Content'],
         'notes'             => ['icon' => 'fa-sticky-note',         'label' => 'Notes'],
         'gcash'             => ['icon' => 'fa-mobile-screen-button', 'label' => 'GCash Transactions'],
+        'settings'          => ['icon' => 'fa-gear',                 'label' => 'Settings'],
     ];
 
     // Get pending count for initial render
-    $db = db();
     $pendingCount = (int)$db->query("SELECT COUNT(*) AS c FROM quotation_requests WHERE status='pending'")->fetch_assoc()['c'];
 
     echo '<aside class="admin-sidebar" id="admin-sidebar">';

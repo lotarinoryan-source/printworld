@@ -3,8 +3,29 @@ require_once '../config.php';
 require_once '../includes/auth.php';
 require_once '../includes/db.php';
 require_once '../includes/functions.php';
-require_once '_layout.php';
 requireAdmin();
+
+$db = db();
+
+// JSON endpoint — must be before any HTML output
+if (isset($_GET['load_samples'])) {
+    ini_set('display_errors', 0);
+    ob_clean();
+    $db->query("CREATE TABLE IF NOT EXISTS service_images (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        service_id INT NOT NULL,
+        image_path VARCHAR(500) NOT NULL,
+        sort_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
+    $sid  = (int)$_GET['load_samples'];
+    $rows = $db->query("SELECT id, image_path FROM service_images WHERE service_id=$sid ORDER BY sort_order, id")->fetch_all(MYSQLI_ASSOC);
+    header('Content-Type: application/json');
+    echo json_encode($rows);
+    exit;
+}
+
+require_once '_layout.php';
 
 $db = db();
 $success = $error = '';
@@ -95,6 +116,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $s->bind_param('i', $id);
         $s->execute();
         $success = 'Image removed.';
+    } elseif ($action === 'upload_samples') {
+        $db->query("CREATE TABLE IF NOT EXISTS service_images (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            service_id INT NOT NULL,
+            image_path VARCHAR(500) NOT NULL,
+            sort_order INT DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )");
+        $id      = (int)$_POST['id'];
+        $allowed = ['image/jpeg','image/png','image/gif','image/webp'];
+        $dir     = UPLOAD_DIR . 'services/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+        // Load existing paths to prevent duplicates
+        $existing = [];
+        $exRes = $db->query("SELECT image_path FROM service_images WHERE service_id=$id");
+        while ($er = $exRes->fetch_assoc()) $existing[] = $er['image_path'];
+
+        $uploaded = 0;
+        $files = $_FILES['sample_images'] ?? [];
+        if (!empty($files['name'][0])) {
+            $count = count($files['name']);
+            for ($i = 0; $i < $count; $i++) {
+                if ($files['error'][$i] !== 0) continue;
+                if (!in_array($files['type'][$i], $allowed)) continue;
+                // Hash check to prevent exact duplicates
+                $hash = md5_file($files['tmp_name'][$i]);
+                $ext  = strtolower(pathinfo($files['name'][$i], PATHINFO_EXTENSION));
+                $dest = $dir . 'svc_' . $id . '_' . $hash . '.' . $ext;
+                $path = 'uploads/services/' . basename($dest);
+                if (in_array($path, $existing)) continue; // skip duplicate
+                if (!file_exists($dest)) {
+                    move_uploaded_file($files['tmp_name'][$i], $dest);
+                }
+                $ins = $db->prepare("INSERT IGNORE INTO service_images (service_id, image_path) VALUES (?,?)");
+                $ins->bind_param('is', $id, $path);
+                $ins->execute();
+                $uploaded++;
+            }
+        }
+        $success = $uploaded . ' sample image(s) uploaded.';
+    } elseif ($action === 'delete_sample') {
+        $imgId = (int)$_POST['img_id'];
+        $row   = $db->query("SELECT image_path FROM service_images WHERE id=$imgId")->fetch_assoc();
+        if ($row) {
+            // Path stored as 'uploads/services/file.jpg' — resolve from project root
+            $full = rtrim(UPLOAD_DIR, '/uploads/') . '/' . $row['image_path'];
+            if (file_exists($full)) @unlink($full);
+            $db->query("DELETE FROM service_images WHERE id=$imgId");
+        }
+        $success = 'Sample image deleted.';
     }
 }
 
@@ -239,7 +311,7 @@ function _saveSignageOptions($db, $slug, $post) {
 
 <!-- Edit Modal -->
 <div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;overflow-y:auto;padding:20px">
-  <div style="background:#fff;padding:32px;width:100%;max-width:520px;border-radius:6px">
+  <div style="background:#fff;padding:32px;width:100%;max-width:520px;border-radius:6px;max-height:90vh;overflow-y:auto;margin:auto">
     <h3 style="margin-bottom:20px">Edit Service</h3>
     <form method="POST" enctype="multipart/form-data">
       <input type="hidden" name="action" value="edit">
@@ -299,6 +371,18 @@ function _saveSignageOptions($db, $slug, $post) {
         <button type="button" class="action-btn" onclick="document.getElementById('edit-modal').style.display='none'">Cancel</button>
       </div>
     </form>
+
+    <!-- Sample Images Upload (separate form) -->
+    <div style="border-top:1px solid #eee;margin-top:20px;padding-top:20px">
+      <p style="font-size:.82rem;font-weight:700;margin-bottom:10px;color:#555"><i class="fas fa-images" style="margin-right:6px;color:#2563eb"></i>Sample Images Gallery</p>
+      <div id="edit-samples-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"></div>
+      <form method="POST" enctype="multipart/form-data" id="samples-upload-form">
+        <input type="hidden" name="action" value="upload_samples">
+        <input type="hidden" name="id" id="samples-svc-id">
+        <input type="file" name="sample_images[]" multiple accept="image/*" class="form-control" style="margin-bottom:8px">
+        <button type="submit" class="action-btn"><i class="fas fa-upload"></i> Upload Samples</button>
+      </form>
+    </div>
   </div>
 </div>
 
@@ -339,13 +423,40 @@ function editService(svc) {
 
   var imgDiv = document.getElementById('edit-current-img');
   if (svc.image_path) {
-    imgDiv.innerHTML = '<img src="../' + svc.image_path + '" style="height:60px;border-radius:4px;border:1px solid #eee;margin-bottom:4px"><br>'
-      + '<small style="color:#888">Current image — upload new to replace</small>';
+    imgDiv.innerHTML =
+      '<div style="display:inline-flex;align-items:flex-start;gap:8px;margin-bottom:8px">'
+      + '<div style="position:relative">'
+      + '<img src="../' + svc.image_path + '" style="height:72px;border-radius:5px;border:1px solid #eee;display:block">'
+      + '<button onclick="deleteMainImage(' + svc.id + ',this)" title="Delete main image"'
+      + ' style="position:absolute;top:3px;right:3px;background:#c00;color:#fff;border:none;border-radius:3px;width:20px;height:20px;cursor:pointer;font-size:.6rem;display:flex;align-items:center;justify-content:center">'
+      + '<i class="fas fa-trash"></i></button>'
+      + '</div>'
+      + '<small style="color:#888;align-self:flex-end">Current image — upload new to replace</small>'
+      + '</div>';
   } else {
     imgDiv.innerHTML = '<small style="color:#aaa">No image yet</small>';
   }
   document.getElementById('edit-modal').style.display = 'flex';
+  document.getElementById('samples-svc-id').value = svc.id;
   updateIconPreview('edit', svc.icon || 'fa-print');
+
+  // Load sample images via fetch
+  fetch('?load_samples=' + svc.id)
+    .then(function(r){ return r.json(); })
+    .then(function(imgs){
+      var grid = document.getElementById('edit-samples-grid');
+      grid.innerHTML = '';
+      if (!imgs.length) { grid.innerHTML = '<small style="color:#aaa">No sample images yet.</small>'; return; }
+      imgs.forEach(function(img){
+        var d = document.createElement('div');
+        d.style.cssText = 'position:relative;width:90px;height:70px;flex-shrink:0';
+        d.innerHTML = '<img src="../' + img.image_path + '" style="width:90px;height:70px;object-fit:cover;border-radius:5px;border:1px solid #eee;display:block">'
+          + '<button onclick="deleteSample(' + img.id + ',this.parentNode)" title="Delete image"'
+          + ' style="position:absolute;top:3px;right:3px;background:#c00;color:#fff;border:none;border-radius:3px;width:20px;height:20px;cursor:pointer;font-size:.7rem;line-height:1;padding:0;display:flex;align-items:center;justify-content:center">'
+          + '<i class="fas fa-trash" style="font-size:.6rem"></i></button>';
+        grid.appendChild(d);
+      });
+    });
 }
 document.getElementById('add-modal').addEventListener('click', function(e){ if(e.target===this) this.style.display='none'; });
 document.getElementById('edit-modal').addEventListener('click', function(e){ if(e.target===this) this.style.display='none'; });
@@ -409,6 +520,31 @@ function updateIconPreview(prefix, icon) {
   var clean = icon.replace(/^fas?\s+/, '').trim();
   var el = document.getElementById(prefix + '-icon-preview');
   if (el) el.innerHTML = '<i class="fas ' + clean + '"></i>';
+}
+
+function deleteSample(imgId, container) {
+  if (!confirm('Are you sure you want to delete this image permanently?')) return;
+  var fd = new FormData();
+  fd.append('action', 'delete_sample');
+  fd.append('img_id', imgId);
+  fetch('services.php', { method: 'POST', body: fd })
+    .then(function(){
+      container.style.transition = 'opacity .3s';
+      container.style.opacity = '0';
+      setTimeout(function(){ container.remove(); }, 320);
+    });
+}
+
+function deleteMainImage(svcId, btn) {
+  if (!confirm('Are you sure you want to delete the main image permanently?')) return;
+  var fd = new FormData();
+  fd.append('action', 'remove_image');
+  fd.append('id', svcId);
+  fetch('services.php', { method: 'POST', body: fd })
+    .then(function(){
+      var imgDiv = document.getElementById('edit-current-img');
+      if (imgDiv) imgDiv.innerHTML = '<small style="color:#aaa">No image yet</small>';
+    });
 }
 </script>
 </body>

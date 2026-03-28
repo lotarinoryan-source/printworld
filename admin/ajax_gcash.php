@@ -23,7 +23,7 @@ $db     = db();
 $action = $_POST['action'] ?? '';
 $type   = $_POST['type']   ?? '';
 
-if (!in_array($type, ['in', 'out'])) {
+if (!in_array($action, ['day_detail', 'lock', 'add_note', 'delete_note', 'toggle_autolock']) && !in_array($type, ['in', 'out'])) {
     echo json_encode(['ok' => false, 'msg' => 'Invalid type.']);
     exit;
 }
@@ -105,6 +105,94 @@ if ($action === 'delete') {
         'summary' => getSummary($db, $table),
         'overall' => getOverall($db),
     ]);
+    exit;
+}
+
+// ── DAY DETAIL ─────────────────────────────────────────────────────────
+if ($action === 'day_detail') {
+    $date = $_POST['date'] ?? '';
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+        echo json_encode(['ok' => false, 'msg' => 'Invalid date.']);
+        exit;
+    }
+
+    $inRows = $db->query("SELECT id, amount, charge, total,
+        TIME_FORMAT(created_at,'%h:%i %p') AS time
+        FROM gcash_cash_in WHERE DATE(created_at)='$date' ORDER BY created_at ASC")
+        ->fetch_all(MYSQLI_ASSOC);
+
+    $outRows = $db->query("SELECT id, amount, charge, total,
+        TIME_FORMAT(created_at,'%h:%i %p') AS time
+        FROM gcash_cash_out WHERE DATE(created_at)='$date' ORDER BY created_at ASC")
+        ->fetch_all(MYSQLI_ASSOC);
+
+    $summary = $db->query("SELECT
+        COALESCE(SUM(amount),0) AS total_amount,
+        COALESCE(SUM(charge),0) AS total_charge,
+        COALESCE(SUM(total),0)  AS total_total
+        FROM (
+            SELECT amount,charge,total FROM gcash_cash_in  WHERE DATE(created_at)='$date'
+            UNION ALL
+            SELECT amount,charge,total FROM gcash_cash_out WHERE DATE(created_at)='$date'
+        ) AS d")->fetch_assoc();
+
+    echo json_encode([
+        'ok'       => true,
+        'cash_in'  => $inRows,
+        'cash_out' => $outRows,
+        'summary'  => $summary,
+    ]);
+    exit;
+}
+
+// ── LOCK (auto-lock from JS) ───────────────────────────────────────────
+if ($action === 'lock') {
+    unset($_SESSION['gcash_unlocked']);
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
+// ── ADD NOTE ───────────────────────────────────────────────────────────
+if ($action === 'add_note') {
+    $note = trim($_POST['note'] ?? '');
+    if (!$note) {
+        echo json_encode(['ok' => false, 'msg' => 'Note cannot be empty.']);
+        exit;
+    }
+    $db->query("CREATE TABLE IF NOT EXISTS gcash_notes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        note TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )");
+    $stmt = $db->prepare("INSERT INTO gcash_notes (note) VALUES (?)");
+    $stmt->bind_param('s', $note);
+    $stmt->execute();
+    $newId = $db->insert_id;
+    echo json_encode([
+        'ok'         => true,
+        'id'         => $newId,
+        'created_at' => date('M d, Y h:i A'),
+    ]);
+    exit;
+}
+
+// ── DELETE NOTE ────────────────────────────────────────────────────────
+if ($action === 'delete_note') {
+    $id = (int)($_POST['id'] ?? 0);
+    if (!$id) { echo json_encode(['ok' => false, 'msg' => 'Invalid ID.']); exit; }
+    $stmt = $db->prepare("DELETE FROM gcash_notes WHERE id=?");
+    $stmt->bind_param('i', $id);
+    $stmt->execute();
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
+// ── TOGGLE AUTOLOCK ────────────────────────────────────────────────────
+if ($action === 'toggle_autolock') {
+    $enabled = ($_POST['enabled'] ?? '1') === '1' ? '1' : '0';
+    $db->query("INSERT INTO site_settings (`key`,`value`) VALUES ('gcash_autolock_enabled','$enabled')
+        ON DUPLICATE KEY UPDATE `value`='$enabled'");
+    echo json_encode(['ok' => true]);
     exit;
 }
 
